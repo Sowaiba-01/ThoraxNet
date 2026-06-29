@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
+env/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# ML / Data
+checkpoints/
+*.pt
+*.pth
+*.onnx
+wandb/
+*.csv
+data/images/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.vercel/
+
+# Misc
+.DS_Store
+*.log
+fairness_report.json
+gradcam_examples.png
+eda_prevalence.png

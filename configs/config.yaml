@@ -1,0 +1,134 @@
+# ChestAI — Centralized Configuration
+# All hyperparameters and paths live here. Never hard-code values in source files.
+
+project:
+  name: "ChestAI"
+  version: "1.0.0"
+  description: "Uncertainty-aware multi-label chest X-ray diagnostic platform"
+  entity: ""          # your W&B username
+  wandb_project: "chestai"
+
+data:
+  root_dir: "/kaggle/input/nih-chest-xrays/images"
+  labels_csv: "/kaggle/input/nih-chest-xrays/Data_Entry_2017.csv"
+  train_val_list: "/kaggle/input/nih-chest-xrays/train_val_list.txt"
+  test_list: "/kaggle/input/nih-chest-xrays/test_list.txt"
+  image_size: 224
+  num_workers: 4
+  pin_memory: true
+
+  # 14 NIH ChestX-ray14 pathology classes (in order)
+  classes:
+    - Atelectasis
+    - Cardiomegaly
+    - Effusion
+    - Infiltration
+    - Mass
+    - Nodule
+    - Pneumonia
+    - Pneumothorax
+    - Consolidation
+    - Edema
+    - Emphysema
+    - Fibrosis
+    - Pleural_Thickening
+    - Hernia
+
+  # Approximate positive-label frequencies (for loss weighting)
+  class_weights:
+    Atelectasis: 0.103
+    Cardiomegaly: 0.025
+    Effusion: 0.119
+    Infiltration: 0.177
+    Mass: 0.051
+    Nodule: 0.056
+    Pneumonia: 0.013
+    Pneumothorax: 0.047
+    Consolidation: 0.042
+    Edema: 0.021
+    Emphysema: 0.022
+    Fibrosis: 0.015
+    Pleural_Thickening: 0.030
+    Hernia: 0.002
+
+model:
+  backbone: "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224"
+  # Fallback: "google/vit-base-patch16-224-in21k"
+  pretrained: true
+  num_classes: 14
+  dropout_rate: 0.3
+  mc_dropout_samples: 20    # number of forward passes for uncertainty estimation
+  freeze_backbone_epochs: 2 # warm up classification head before unfreezing backbone
+
+training:
+  seed: 42
+  epochs: 30
+  batch_size: 32
+  val_batch_size: 64
+  learning_rate: 1.0e-4
+  backbone_lr_multiplier: 0.1   # backbone gets 10x smaller lr
+  weight_decay: 1.0e-5
+  warmup_epochs: 3
+  scheduler: "cosine"           # cosine annealing with warmup
+  grad_clip: 1.0
+  amp: true                     # automatic mixed precision
+  early_stopping_patience: 5
+  checkpoint_dir: "/kaggle/working/checkpoints"
+  save_top_k: 3
+
+loss:
+  type: "weighted_focal_bce"
+  focal_gamma: 2.0
+  focal_alpha: 0.25
+  pos_weight_scale: 5.0         # scale positive class weights further
+
+augmentation:
+  train:
+    random_horizontal_flip: 0.5
+    random_rotation: 10
+    color_jitter:
+      brightness: 0.2
+      contrast: 0.2
+    random_affine:
+      degrees: 0
+      translate: [0.05, 0.05]
+    normalize:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+  val:
+    normalize:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+
+explainability:
+  gradcam_layer: "visual.trunk.blocks.-1.norm1"   # last ViT block norm
+  gradcam_alpha: 0.4                               # overlay transparency
+  heatmap_colormap: "jet"
+
+fairness:
+  age_bins: [0, 40, 60, 120]
+  age_labels: ["<40", "40-60", ">60"]
+  demographic_cols: ["Patient Age", "Patient Gender"]
+
+report_generation:
+  provider: "groq"
+  model: "llama3-70b-8192"
+  max_tokens: 512
+  temperature: 0.2
+  confidence_threshold: 0.5    # findings above this are reported as present
+
+api:
+  host: "0.0.0.0"
+  port: 7860                   # HuggingFace Spaces default
+  workers: 1
+  max_upload_size_mb: 10
+  rate_limit: "10/minute"
+  cors_origins:
+    - "http://localhost:3000"
+    - "https://your-vercel-app.vercel.app"   # update after deploying frontend
+
+inference:
+  device: "cuda"               # falls back to cpu automatically
+  model_hub_repo: ""           # e.g. "yourusername/chestai-model"
+  model_filename: "chestai_best.pt"
+  onnx_export: false           # set true to export ONNX for faster CPU inference

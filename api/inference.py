@@ -1,8 +1,5 @@
 """
 Inference pipeline: image → predictions + GradCAM + report.
-
-Loaded once at startup (singleton pattern) to avoid per-request model reload.
-Thread-safe via asyncio lock for the GradCAM backward pass (not thread-safe).
 """
 
 from __future__ import annotations
@@ -25,22 +22,17 @@ from report_generation.generator import RadiologyReportGenerator, generate_repor
 from api.schemas import FindingResult, PredictionResponse
 from data.dataset import CLASSES
 
-
-# Probability threshold for flagging a finding as present.
-THRESHOLD = 0.5
+THRESHOLDS = {
+    "Atelectasis": 0.63, "Cardiomegaly": 0.74, "Effusion": 0.66,
+    "Infiltration": 0.58, "Mass": 0.64, "Nodule": 0.58,
+    "Pneumonia": 0.67, "Pneumothorax": 0.66, "Consolidation": 0.67,
+    "Edema": 0.75, "Emphysema": 0.61, "Fibrosis": 0.60,
+    "Pleural_Thickening": 0.61, "Hernia": 0.62,
+}
 UNCERTAINTY_THRESHOLD = 0.15
 
 
 class InferencePipeline:
-    """
-    Singleton inference pipeline. Initialise once at app startup.
-
-    Usage:
-        pipeline = InferencePipeline()
-        await pipeline.load()
-        response = await pipeline.predict(image_bytes, metadata)
-    """
-
     _instance: "InferencePipeline | None" = None
 
     def __init__(self) -> None:
@@ -53,7 +45,6 @@ class InferencePipeline:
         self.model_version = "1.0.0"
 
     async def load(self) -> None:
-        """Load model weights from HuggingFace Hub or local path."""
         from huggingface_hub import hf_hub_download
 
         model_repo = os.environ.get("MODEL_HUB_REPO", "")
@@ -67,7 +58,7 @@ class InferencePipeline:
             )
         elif not checkpoint_path:
             raise RuntimeError(
-                "Set MODEL_CHECKPOINT (local path) or MODEL_HUB_REPO (HF Hub repo ID) env var."
+                "Set MODEL_CHECKPOINT or MODEL_HUB_REPO env var."
             )
 
         print(f"[Pipeline] Loading checkpoint: {checkpoint_path}")
@@ -89,67 +80,48 @@ class InferencePipeline:
 
         print(f"[Pipeline] Model loaded on {self.device}.")
 
-    # ------------------------------------------------------------------
-    # Predict
-    # ------------------------------------------------------------------
-
     async def predict(
         self,
         image_bytes: bytes,
         patient_age: float | None = None,
         patient_gender: str | None = None,
     ) -> PredictionResponse:
-        """
-        Full async inference pipeline for a single X-ray image.
-
-        Args:
-            image_bytes: Raw image bytes (PNG or JPEG).
-            patient_age: Optional patient age for report context.
-            patient_gender: Optional 'M' or 'F'.
-
-        Returns:
-            PredictionResponse with findings, GradCAM, and report.
-        """
         if self.model is None:
             raise RuntimeError("Model not loaded. Call await pipeline.load() first.")
 
         t0 = time.perf_counter()
 
-        # Preprocess image.
         pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         tensor = self.transform(pil_image).unsqueeze(0).to(self.device)
 
-        # MC Dropout inference (async-safe via lock for gradcam backward pass).
         async with self._lock:
             mc_results = mc_predict(self.model, tensor, n_samples=20)
-            mean_probs = mc_results["mean"][0].cpu().numpy()    # (14,)
-            std_probs  = mc_results["std"][0].cpu().numpy()     # (14,)
+            mean_probs = mc_results["mean"][0].cpu().numpy()
+            std_probs  = mc_results["std"][0].cpu().numpy()
             entropy    = float(mc_results["entropy"][0].item())
 
-            # GradCAM for all positive findings.
             gradcam_classes = [
-                cls for cls, p in zip(CLASSES, mean_probs) if p >= THRESHOLD
+                cls for cls, p in zip(CLASSES, mean_probs)
+                if p >= THRESHOLDS.get(cls, 0.5)
             ]
             gradcam_images = {}
             for cls_name in gradcam_classes:
                 cls_idx = CLASSES.index(cls_name)
                 heatmap = self.gradcam.generate(tensor, cls_idx)
                 overlay = self.gradcam.overlay(pil_image, heatmap)
-                gradcam_images[cls_name] = overlay  # PIL Image (store server-side)
+                gradcam_images[cls_name] = overlay
 
-        # Build findings list.
         findings = [
             FindingResult(
                 name=cls,
                 probability=float(p),
                 uncertainty=float(s),
-                present=float(p) >= THRESHOLD,
+                present=float(p) >= THRESHOLDS.get(cls, 0.5),
                 high_uncertainty=float(s) >= UNCERTAINTY_THRESHOLD,
             )
             for cls, p, s in zip(CLASSES, mean_probs, std_probs)
         ]
 
-        # Generate report.
         patient_info = {}
         if patient_age is not None:
             patient_info["age"] = patient_age
@@ -186,5 +158,4 @@ class InferencePipeline:
         return self.model is not None
 
 
-# Module-level singleton.
 pipeline = InferencePipeline()

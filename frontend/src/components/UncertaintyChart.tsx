@@ -1,8 +1,10 @@
 /**
- * Radar chart showing per-class uncertainty (MC Dropout std deviation).
- * High uncertainty classes are flagged for radiologist review.
+ * Radar chart showing per-class uncertainty — mint & white theme.
  */
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip } from "recharts";
+import {
+  RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  ResponsiveContainer, Tooltip,
+} from "recharts";
 import { FindingResult } from "@/lib/api";
 
 interface Props {
@@ -10,46 +12,63 @@ interface Props {
 }
 
 export default function UncertaintyChart({ findings }: Props) {
-  const data = findings
-    .filter((f) => f.present || f.uncertainty > 0.08)
-    .map((f) => ({
-      class: f.name.replace("_", " ").replace("Pleural Thickening", "Pleural Th."),
-      uncertainty: Math.round(f.uncertainty * 100),
-      probability: Math.round(f.probability * 100),
-    }));
-
-  if (data.length === 0) return null;
+  const data = findings.map((f) => ({
+    subject: f.name.replace("_", " "),
+    uncertainty: Math.round(f.uncertainty * 100),
+    probability: Math.round(f.probability * 100),
+  }));
 
   return (
-    <div className="glass-card p-6">
-      <h3 className="text-sm font-semibold text-slate-300 mb-4">Uncertainty Distribution</h3>
+    <div className="space-y-3">
+      <div className="flex items-center gap-4 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-0.5 bg-emerald-400 inline-block rounded" />
+          Uncertainty (MC Dropout std)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-0.5 bg-indigo-300 inline-block rounded" />
+          Probability
+        </span>
+      </div>
       <ResponsiveContainer width="100%" height={260}>
-        <RadarChart data={data}>
-          <PolarGrid stroke="#334155" />
-          <PolarAngleAxis dataKey="class" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-          <Radar
-            name="Probability"
-            dataKey="probability"
-            stroke="#3b82f6"
-            fill="#3b82f6"
-            fillOpacity={0.2}
+        <RadarChart data={data} margin={{ top: 8, right: 24, bottom: 8, left: 24 }}>
+          <PolarGrid stroke="#d1fae5" />
+          <PolarAngleAxis
+            dataKey="subject"
+            tick={{ fontSize: 10, fill: "#6b7280" }}
           />
           <Radar
             name="Uncertainty"
             dataKey="uncertainty"
-            stroke="#f59e0b"
-            fill="#f59e0b"
-            fillOpacity={0.15}
+            stroke="#10b981"
+            fill="#10b981"
+            fillOpacity={0.2}
+            strokeWidth={1.5}
+          />
+          <Radar
+            name="Probability"
+            dataKey="probability"
+            stroke="#a5b4fc"
+            fill="#a5b4fc"
+            fillOpacity={0.1}
+            strokeWidth={1}
+            strokeDasharray="4 2"
           />
           <Tooltip
-            contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8 }}
-            labelStyle={{ color: "#f1f5f9" }}
-            itemStyle={{ color: "#94a3b8" }}
+            contentStyle={{
+              background: "#ffffff",
+              border: "1px solid #d1fae5",
+              borderRadius: "10px",
+              fontSize: "12px",
+              color: "#111827",
+              boxShadow: "0 4px 12px rgba(16,185,129,0.08)",
+            }}
+            formatter={(val: number, name: string) => [`${val}%`, name]}
           />
         </RadarChart>
       </ResponsiveContainer>
-      <p className="text-xs text-slate-500 text-center mt-2">
-        Blue = probability · Amber = uncertainty (MC Dropout)
+      <p className="text-xs text-gray-400 text-center">
+        High uncertainty classes require radiologist review.
       </p>
     </div>
   );

@@ -1,9 +1,9 @@
 /**
- * Main page — X-ray upload + analysis results.
+ * Main page — mint & white mobile-first design.
  */
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Activity, Github, AlertCircle, Loader2 } from "lucide-react";
+import { Activity, Github, AlertCircle, Loader2, ChevronDown, ChevronUp, BarChart2 } from "lucide-react";
 import XRayUploader from "@/components/XRayUploader";
 import FindingsPanel from "@/components/FindingsPanel";
 import ReportViewer from "@/components/ReportViewer";
@@ -13,20 +13,21 @@ import { analyzeXray, PredictionResponse } from "@/lib/api";
 type AppState = "idle" | "loading" | "results" | "error";
 
 export default function Home() {
-  const [state, setState] = useState<AppState>("idle");
-  const [results, setResults] = useState<PredictionResponse | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string>("");
-  const [patientAge, setPatientAge] = useState<string>("");
+  const [state, setState]               = useState<AppState>("idle");
+  const [results, setResults]           = useState<PredictionResponse | null>(null);
+  const [errorMsg, setErrorMsg]         = useState<string>("");
+  const [patientAge, setPatientAge]     = useState<string>("");
   const [patientGender, setPatientGender] = useState<string>("");
+  const [showChart, setShowChart]       = useState(false);
 
   const handleFileSelect = async (file: File) => {
     setState("loading");
     setResults(null);
     setErrorMsg("");
     try {
-      const age = patientAge ? parseFloat(patientAge) : undefined;
+      const age    = patientAge    ? parseFloat(patientAge) : undefined;
       const gender = patientGender || undefined;
-      const data = await analyzeXray(file, age, gender);
+      const data   = await analyzeXray(file, age, gender);
       setResults(data);
       setState("results");
     } catch (err: any) {
@@ -46,72 +47,65 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="border-b border-slate-800/50 sticky top-0 z-50 backdrop-blur-md bg-slate-950/80">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <Activity size={20} className="text-white" />
+      <header className="bg-white border-b border-emerald-100 sticky top-0 z-50">
+        <div className="max-w-2xl mx-auto px-4 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center shadow-sm">
+              <Activity size={18} className="text-white" />
             </div>
             <div>
-              <h1 className="font-bold text-white tracking-tight">ChestAI</h1>
-              <p className="text-xs text-slate-500">Chest X-Ray Diagnostic Platform</p>
+              <h1 className="font-bold text-gray-900 leading-tight">ChestAI</h1>
+              <p className="text-[10px] text-emerald-600 font-medium tracking-wide">X-RAY DIAGNOSTIC PLATFORM</p>
             </div>
           </div>
           <a
-            href="https://github.com/yourusername/chestai"
+            href="https://github.com/Sowaiba-01/chestai"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm"
+            className="flex items-center gap-1.5 text-gray-500 hover:text-emerald-600 transition-colors text-sm"
           >
-            <Github size={18} />
-            <span className="hidden sm:inline">View on GitHub</span>
+            <Github size={17} />
+            <span className="hidden sm:inline text-xs font-medium">GitHub</span>
           </a>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        {/* Hero */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-3 pt-4"
-        >
-          <h2 className="text-3xl sm:text-4xl font-bold text-white">
-            AI Chest X-Ray Analysis
-          </h2>
-          <p className="text-slate-400 max-w-xl mx-auto text-sm sm:text-base">
-            BioMedCLIP-powered detection of 14 pathologies with Monte Carlo uncertainty
-            estimation and auto-generated radiology reports.
-          </p>
-          <div className="flex items-center justify-center gap-4 text-xs text-slate-500 pt-1">
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block" />
-              NIH ChestX-ray14 trained
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-blue-400 rounded-full inline-block" />
-              MC Dropout uncertainty
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-purple-400 rounded-full inline-block" />
-              GradCAM explainability
-            </span>
-          </div>
-        </motion.div>
+      <main className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
-        {/* Upload card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="glass-card p-6 space-y-5"
-        >
-          {/* Optional patient metadata */}
-          <div className="grid grid-cols-2 gap-4">
+        {/* Hero — only show on idle */}
+        <AnimatePresence>
+          {state === "idle" && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              className="text-center pt-2 pb-1 space-y-2"
+            >
+              <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium px-3 py-1 rounded-full">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                BioMedCLIP · NIH ChestX-ray14 · Val AUC 0.8215
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                AI Chest X-Ray Analysis
+              </h2>
+              <p className="text-gray-500 text-sm max-w-md mx-auto leading-relaxed">
+                Detects 14 pathologies with Monte Carlo uncertainty estimation
+                and auto-generated radiology reports.
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Patient info */}
+        <div className="mint-card p-4">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            Patient Info <span className="text-gray-300 font-normal normal-case">(optional)</span>
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-slate-400 mb-1.5 block">Patient Age (optional)</label>
+              <label className="text-xs text-gray-500 mb-1 block">Age</label>
               <input
                 type="number"
                 min={0}
@@ -119,61 +113,87 @@ export default function Home() {
                 value={patientAge}
                 onChange={(e) => setPatientAge(e.target.value)}
                 placeholder="e.g. 45"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                disabled={state === "loading"}
+                className="w-full border border-emerald-100 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all placeholder-gray-300 disabled:opacity-50 bg-white"
               />
             </div>
             <div>
-              <label className="text-xs text-slate-400 mb-1.5 block">Patient Gender (optional)</label>
+              <label className="text-xs text-gray-500 mb-1 block">Sex</label>
               <select
                 value={patientGender}
                 onChange={(e) => setPatientGender(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                disabled={state === "loading"}
+                className="w-full border border-emerald-100 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all disabled:opacity-50 bg-white"
               >
-                <option value="">Not specified</option>
+                <option value="">Unknown</option>
                 <option value="M">Male</option>
                 <option value="F">Female</option>
               </select>
             </div>
           </div>
+        </div>
 
+        {/* Upload */}
+        <div className="mint-card p-4">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            X-Ray Image
+          </h3>
           <XRayUploader onFileSelect={handleFileSelect} isLoading={state === "loading"} />
-        </motion.div>
+        </div>
 
-        {/* Loading state */}
+        {/* Loading */}
         <AnimatePresence>
           {state === "loading" && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center gap-4 py-12"
+              className="mint-card p-6 flex flex-col items-center gap-4 text-center"
             >
-              <Loader2 className="animate-spin text-blue-400" size={40} />
-              <div className="text-center">
-                <p className="text-slate-200 font-medium">Analyzing X-ray...</p>
-                <p className="text-slate-500 text-sm mt-1">Running 20 MC Dropout passes · Generating GradCAM · Building report</p>
+              <div className="relative">
+                <div className="w-14 h-14 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center">
+                  <Loader2 className="text-emerald-500 animate-spin" size={24} />
+                </div>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-800">Analyzing X-Ray</p>
+                <p className="text-sm text-gray-400 mt-1">Running 20 MC Dropout passes · GradCAM · Report generation</p>
+              </div>
+              <div className="w-full bg-emerald-50 rounded-full h-1.5 overflow-hidden">
+                <motion.div
+                  className="h-full bg-emerald-400 rounded-full"
+                  animate={{ width: ["0%", "90%"] }}
+                  transition={{ duration: 4, ease: "easeInOut" }}
+                />
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Error state */}
+        {/* Error */}
         <AnimatePresence>
           {state === "error" && (
             <motion.div
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="flex items-start gap-3 p-5 bg-red-500/10 border border-red-500/20 rounded-xl"
+              className="mint-card p-5"
             >
-              <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={20} />
-              <div>
-                <p className="text-red-300 font-medium">Analysis Failed</p>
-                <p className="text-red-400/70 text-sm mt-1">{errorMsg}</p>
-                <button onClick={reset} className="mt-3 text-xs text-blue-400 hover:underline">
-                  Try again
-                </button>
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="text-red-500" size={18} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm">Analysis Failed</p>
+                  <p className="text-sm text-gray-500 mt-1 break-words">{errorMsg}</p>
+                </div>
               </div>
+              <button
+                onClick={reset}
+                className="mt-4 w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-medium transition-colors"
+              >
+                Try Again
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -182,57 +202,86 @@ export default function Home() {
         <AnimatePresence>
           {state === "results" && results && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-6"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4"
             >
+              {/* Summary pill */}
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">Analysis Results</h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-gray-800">Results</span>
+                  <span className="bg-emerald-100 text-emerald-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                    {results.findings.filter(f => f.present).length} findings
+                  </span>
+                </div>
                 <button
                   onClick={reset}
-                  className="text-sm text-slate-400 hover:text-white transition-colors"
+                  className="text-xs text-gray-400 hover:text-emerald-600 transition-colors font-medium"
                 >
-                  Analyze another
+                  New scan
                 </button>
               </div>
 
-              <div className="grid lg:grid-cols-2 gap-6">
-                {/* Findings */}
-                <div className="glass-card p-6">
-                  <h3 className="font-semibold text-slate-200 mb-4">Pathology Findings</h3>
-                  <FindingsPanel findings={results.findings} />
-                </div>
-
-                {/* Uncertainty chart */}
-                <UncertaintyChart findings={results.findings} />
+              {/* Findings */}
+              <div className="mint-card p-4">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                  Pathology Detection
+                </h3>
+                <FindingsPanel findings={results.findings} />
               </div>
 
-              {/* Radiology Report */}
-              <ReportViewer
-                report={results.report}
-                inferenceTimeMs={results.inference_time_ms}
-                modelVersion={results.model_version}
-              />
+              {/* Uncertainty chart — collapsible */}
+              <div className="mint-card overflow-hidden">
+                <button
+                  onClick={() => setShowChart(!showChart)}
+                  className="w-full p-4 flex items-center justify-between text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 bg-indigo-50 rounded-lg flex items-center justify-center">
+                      <BarChart2 size={14} className="text-indigo-500" />
+                    </div>
+                    <span className="text-sm font-semibold text-gray-800">Uncertainty Analysis</span>
+                  </div>
+                  {showChart
+                    ? <ChevronUp size={16} className="text-gray-400" />
+                    : <ChevronDown size={16} className="text-gray-400" />
+                  }
+                </button>
+                <AnimatePresence>
+                  {showChart && (
+                    <motion.div
+                      initial={{ height: 0 }}
+                      animate={{ height: "auto" }}
+                      exit={{ height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-4 pb-4 border-t border-emerald-50">
+                        <div className="pt-4">
+                          <UncertaintyChart findings={results.findings} />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
-              {/* GradCAM notice */}
-              {results.gradcam_available && (
-                <div className="glass-card p-4 text-sm text-slate-400">
-                  <span className="text-blue-400 font-medium">GradCAM heatmaps</span> available for:{" "}
-                  {results.gradcam_classes.map((c) => c.replace("_", " ")).join(", ")}. 
-                  Retrieve via <code className="text-slate-300 bg-slate-800 px-1 rounded">/api/v1/gradcam/&#123;session_id&#125;/&#123;class&#125;</code>
-                </div>
+              {/* Report */}
+              {results.report && (
+                <ReportViewer
+                  report={results.report}
+                  inferenceTimeMs={results.inference_time_ms}
+                  modelVersion={results.model_version}
+                />
               )}
+
+              {/* Disclaimer footer */}
+              <p className="text-center text-xs text-gray-300 pb-4">
+                ChestAI · BioMedCLIP · For research use only · Not FDA cleared
+              </p>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Footer */}
-        <footer className="text-center text-xs text-slate-600 pb-8 pt-4">
-          ChestAI is a research tool. Not for clinical use. · 
-          Model trained on NIH ChestX-ray14 · 
-          Built with BioMedCLIP + FastAPI + Next.js
-        </footer>
       </main>
     </div>
   );

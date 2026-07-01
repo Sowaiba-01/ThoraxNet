@@ -1,9 +1,9 @@
 /**
- * Structured radiology report display with section parsing and copy button.
+ * Structured radiology report display — mint & white theme.
  */
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { FileText, Copy, Check, Clock } from "lucide-react";
+import { FileText, Copy, Check, Clock, AlertTriangle } from "lucide-react";
 
 interface Props {
   report: string;
@@ -22,11 +22,11 @@ function parseReport(report: string): Record<string, string> {
   return sections;
 }
 
-const SECTION_COLORS: Record<string, string> = {
-  FINDINGS: "text-blue-400 border-blue-500/30",
-  IMPRESSION: "text-purple-400 border-purple-500/30",
-  RECOMMENDATION: "text-amber-400 border-amber-500/30",
-  REPORT: "text-slate-400 border-slate-500/30",
+const SECTION_STYLES: Record<string, { label: string; bg: string; border: string; text: string; dot: string }> = {
+  FINDINGS:       { label: "Findings",       bg: "bg-emerald-50",  border: "border-emerald-200", text: "text-emerald-800", dot: "bg-emerald-500" },
+  IMPRESSION:     { label: "Impression",     bg: "bg-indigo-50",   border: "border-indigo-200",  text: "text-indigo-800",  dot: "bg-indigo-500" },
+  RECOMMENDATION: { label: "Recommendation", bg: "bg-amber-50",    border: "border-amber-200",   text: "text-amber-800",   dot: "bg-amber-500" },
+  REPORT:         { label: "Report",         bg: "bg-gray-50",     border: "border-gray-200",    text: "text-gray-800",    dot: "bg-gray-400" },
 };
 
 export default function ReportViewer({ report, inferenceTimeMs, modelVersion }: Props) {
@@ -43,49 +43,56 @@ export default function ReportViewer({ report, inferenceTimeMs, modelVersion }: 
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-card p-6 space-y-4"
+      className="mint-card p-5 space-y-4"
     >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <FileText className="text-blue-400" size={18} />
-          <h2 className="font-semibold text-slate-100">Radiology Report</h2>
-          <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded">
-            AI-generated · v{modelVersion}
-          </span>
+          <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+            <FileText className="text-emerald-600" size={16} />
+          </div>
+          <div>
+            <h2 className="font-semibold text-gray-900 text-sm">Radiology Report</h2>
+            <span className="text-xs text-gray-400">AI-generated · v{modelVersion}</span>
+          </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1 text-xs text-slate-500">
-            <Clock size={12} />
+          <span className="flex items-center gap-1 text-xs text-gray-400">
+            <Clock size={11} />
             {inferenceTimeMs.toFixed(0)}ms
           </span>
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-emerald-600 bg-gray-100 hover:bg-emerald-50 border border-gray-200 hover:border-emerald-200 px-3 py-1.5 rounded-lg transition-all"
           >
-            {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-            {copied ? "Copied" : "Copy"}
+            {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+            {copied ? "Copied!" : "Copy"}
           </button>
         </div>
       </div>
 
       {/* Disclaimer */}
-      <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-2.5 text-xs text-amber-300">
-        ⚠️ This report is AI-generated for research purposes only. Not a substitute for radiologist interpretation.
+      <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-700">
+        <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+        <span>AI-generated report. Not a substitute for professional radiologist review.</span>
       </div>
 
-      {/* Report sections */}
-      <div className="space-y-4">
-        {Object.entries(sections).map(([section, content]) => (
-          <div key={section}>
-            <h3 className={`text-xs font-bold tracking-widest uppercase mb-2 ${SECTION_COLORS[section]?.split(" ")[0] ?? "text-slate-400"}`}>
-              {section}
-            </h3>
-            <div className={`border-l-2 pl-4 ${SECTION_COLORS[section]?.split(" ")[1] ?? "border-slate-500/30"}`}>
-              <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{content}</p>
+      {/* Sections */}
+      <div className="space-y-3">
+        {Object.entries(sections).map(([key, text]) => {
+          const style = SECTION_STYLES[key] ?? SECTION_STYLES["REPORT"];
+          return (
+            <div key={key} className={`${style.bg} border ${style.border} rounded-xl p-4`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`w-2 h-2 rounded-full ${style.dot}`} />
+                <span className={`text-xs font-semibold uppercase tracking-wider ${style.text}`}>
+                  {style.label}
+                </span>
+              </div>
+              <p className={`text-sm leading-relaxed ${style.text}`}>{text}</p>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </motion.div>
   );

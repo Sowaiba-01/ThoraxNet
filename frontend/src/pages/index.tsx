@@ -1,288 +1,181 @@
-/**
- * Main page — mint & white mobile-first design.
- */
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Activity, Github, AlertCircle, Loader2, ChevronDown, ChevronUp, BarChart2 } from "lucide-react";
-import XRayUploader from "@/components/XRayUploader";
-import FindingsPanel from "@/components/FindingsPanel";
-import ReportViewer from "@/components/ReportViewer";
-import UncertaintyChart from "@/components/UncertaintyChart";
-import { analyzeXray, PredictionResponse } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/router";
+import Link from "next/link";
+import { Loader2, ChevronRight, Scan, TrendingUp } from "lucide-react";
+import Layout from "@/components/Layout";
+import { getScanHistory, ScanRecord } from "@/lib/api";
 
-type AppState = "idle" | "loading" | "results" | "error";
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function getTopFinding(record: ScanRecord): string {
+  const present = record.findings.filter(f => f.present);
+  if (present.length === 0) return "No findings";
+  const top = present.sort((a, b) => b.probability - a.probability)[0];
+  return top.name.replace("_", " ");
+}
 
 export default function Home() {
-  const [state, setState]               = useState<AppState>("idle");
-  const [results, setResults]           = useState<PredictionResponse | null>(null);
-  const [errorMsg, setErrorMsg]         = useState<string>("");
-  const [patientAge, setPatientAge]     = useState<string>("");
-  const [patientGender, setPatientGender] = useState<string>("");
-  const [showChart, setShowChart]       = useState(false);
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [history, setHistory] = useState<ScanRecord[]>([]);
 
-  const handleFileSelect = async (file: File) => {
-    setState("loading");
-    setResults(null);
-    setErrorMsg("");
-    try {
-      const age    = patientAge    ? parseFloat(patientAge) : undefined;
-      const gender = patientGender || undefined;
-      const data   = await analyzeXray(file, age, gender);
-      setResults(data);
-      setState("results");
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.message ||
-        "Analysis failed. Please check the API is running.";
-      setErrorMsg(msg);
-      setState("error");
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/login");
     }
-  };
+  }, [status, router]);
 
-  const reset = () => {
-    setState("idle");
-    setResults(null);
-    setErrorMsg("");
-  };
+  useEffect(() => {
+    if (status === "authenticated") {
+      setHistory(getScanHistory());
+    }
+  }, [status]);
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="text-emerald-500 animate-spin" size={28} />
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated") return null;
+
+  const firstName = session?.user?.name?.split(" ")[0] ?? "there";
+  const initials = session?.user?.name
+    ? session.user.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
+    : "U";
+
+  const totalScans = history.length;
+  const positiveScans = history.filter(r => r.findings.some(f => f.present)).length;
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="bg-white border-b border-emerald-100 sticky top-0 z-50">
-        <div className="max-w-2xl mx-auto px-4 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center shadow-sm">
-              <Activity size={18} className="text-white" />
-            </div>
-            <div>
-              <h1 className="font-bold text-gray-900 leading-tight">ChestAI</h1>
-              <p className="text-[10px] text-emerald-600 font-medium tracking-wide">X-RAY DIAGNOSTIC PLATFORM</p>
-            </div>
+    <Layout title="Home">
+      <div className="space-y-5">
+
+        {/* Greeting */}
+        <div className="flex items-center justify-between pt-1">
+          <div>
+            <p className="text-xs text-gray-400">Good day,</p>
+            <h2 className="text-xl font-bold text-gray-900">{firstName}</h2>
           </div>
-          <a
-            href="https://github.com/Sowaiba-01/chestai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-gray-500 hover:text-emerald-600 transition-colors text-sm"
-          >
-            <Github size={17} />
-            <span className="hidden sm:inline text-xs font-medium">GitHub</span>
-          </a>
-        </div>
-      </header>
-
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-5">
-
-        {/* Hero — only show on idle */}
-        <AnimatePresence>
-          {state === "idle" && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              className="text-center pt-2 pb-1 space-y-2"
-            >
-              <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium px-3 py-1 rounded-full">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                BioMedCLIP · NIH ChestX-ray14 · Val AUC 0.8215
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                AI Chest X-Ray Analysis
-              </h2>
-              <p className="text-gray-500 text-sm max-w-md mx-auto leading-relaxed">
-                Detects 14 pathologies with Monte Carlo uncertainty estimation
-                and auto-generated radiology reports.
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Patient info */}
-        <div className="mint-card p-4">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            Patient Info <span className="text-gray-300 font-normal normal-case">(optional)</span>
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Age</label>
-              <input
-                type="number"
-                min={0}
-                max={120}
-                value={patientAge}
-                onChange={(e) => setPatientAge(e.target.value)}
-                placeholder="e.g. 45"
-                disabled={state === "loading"}
-                className="w-full border border-emerald-100 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all placeholder-gray-300 disabled:opacity-50 bg-white"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Sex</label>
-              <select
-                value={patientGender}
-                onChange={(e) => setPatientGender(e.target.value)}
-                disabled={state === "loading"}
-                className="w-full border border-emerald-100 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all disabled:opacity-50 bg-white"
-              >
-                <option value="">Unknown</option>
-                <option value="M">Male</option>
-                <option value="F">Female</option>
-              </select>
-            </div>
+          <div className="w-10 h-10 rounded-full bg-emerald-100 border-2 border-emerald-200 flex items-center justify-center text-emerald-700 font-bold text-sm overflow-hidden">
+            {session?.user?.image ? (
+              <img src={session.user.image} className="w-full h-full object-cover" alt="avatar" />
+            ) : (
+              initials
+            )}
           </div>
         </div>
 
-        {/* Upload */}
-        <div className="mint-card p-4">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            X-Ray Image
-          </h3>
-          <XRayUploader onFileSelect={handleFileSelect} isLoading={state === "loading"} />
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="mint-card p-3 text-center">
+            <p className="text-2xl font-bold text-emerald-600">{totalScans}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Total scans</p>
+          </div>
+          <div className="mint-card p-3 text-center">
+            <p className="text-2xl font-bold text-emerald-600">0.82</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Model AUC</p>
+          </div>
+          <div className="mint-card p-3 text-center">
+            <p className="text-2xl font-bold text-emerald-600">14</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Pathologies</p>
+          </div>
         </div>
 
-        {/* Loading */}
-        <AnimatePresence>
-          {state === "loading" && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="mint-card p-6 flex flex-col items-center gap-4 text-center"
-            >
-              <div className="relative">
-                <div className="w-14 h-14 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center">
-                  <Loader2 className="text-emerald-500 animate-spin" size={24} />
-                </div>
-              </div>
-              <div>
-                <p className="font-semibold text-gray-800">Analyzing X-Ray</p>
-                <p className="text-sm text-gray-400 mt-1">Running 20 MC Dropout passes · GradCAM · Report generation</p>
-              </div>
-              <div className="w-full bg-emerald-50 rounded-full h-1.5 overflow-hidden">
-                <motion.div
-                  className="h-full bg-emerald-400 rounded-full"
-                  animate={{ width: ["0%", "90%"] }}
-                  transition={{ duration: 4, ease: "easeInOut" }}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* New scan CTA */}
+        <Link href="/scan">
+          <div className="rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:opacity-95 transition-opacity"
+               style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}>
+            <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <Scan size={22} className="text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-white text-base">New scan</p>
+              <p className="text-xs text-white/75 mt-0.5">Upload a chest X-ray to analyze</p>
+            </div>
+            <ChevronRight size={18} className="text-white/70" />
+          </div>
+        </Link>
 
-        {/* Error */}
-        <AnimatePresence>
-          {state === "error" && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="mint-card p-5"
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <AlertCircle className="text-red-500" size={18} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 text-sm">Analysis Failed</p>
-                  <p className="text-sm text-gray-500 mt-1 break-words">{errorMsg}</p>
-                </div>
-              </div>
-              <button
-                onClick={reset}
-                className="mt-4 w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-medium transition-colors"
-              >
-                Try Again
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Model info card */}
+        <div className="mint-card p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+            <TrendingUp size={16} className="text-emerald-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-800">BioMedCLIP ViT-B/16</p>
+            <p className="text-xs text-gray-400 mt-0.5">Monte Carlo Dropout · 20 passes · GradCAM · Groq report</p>
+          </div>
+          <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full flex-shrink-0">
+            v1.0.0
+          </span>
+        </div>
 
-        {/* Results */}
-        <AnimatePresence>
-          {state === "results" && results && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-4"
-            >
-              {/* Summary pill */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-gray-800">Results</span>
-                  <span className="bg-emerald-100 text-emerald-700 text-xs font-medium px-2 py-0.5 rounded-full">
-                    {results.findings.filter(f => f.present).length} findings
-                  </span>
-                </div>
-                <button
-                  onClick={reset}
-                  className="text-xs text-gray-400 hover:text-emerald-600 transition-colors font-medium"
-                >
-                  New scan
+        {/* Recent scans */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent scans</p>
+            {totalScans > 0 && (
+              <Link href="/stats" className="text-xs text-emerald-600 font-medium">View all</Link>
+            )}
+          </div>
+
+          {history.length === 0 ? (
+            <div className="mint-card p-6 text-center">
+              <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <Scan size={22} className="text-emerald-400" />
+              </div>
+              <p className="text-sm font-medium text-gray-600">No scans yet</p>
+              <p className="text-xs text-gray-400 mt-1">Upload a chest X-ray to get started</p>
+              <Link href="/scan">
+                <button className="mt-4 px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-medium transition-colors">
+                  Start first scan
                 </button>
-              </div>
-
-              {/* Findings */}
-              <div className="mint-card p-4">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                  Pathology Detection
-                </h3>
-                <FindingsPanel findings={results.findings} />
-              </div>
-
-              {/* Uncertainty chart — collapsible */}
-              <div className="mint-card overflow-hidden">
-                <button
-                  onClick={() => setShowChart(!showChart)}
-                  className="w-full p-4 flex items-center justify-between text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-indigo-50 rounded-lg flex items-center justify-center">
-                      <BarChart2 size={14} className="text-indigo-500" />
+              </Link>
+            </div>
+          ) : (
+            <div className="mint-card divide-y divide-emerald-50">
+              {history.slice(0, 5).map((record, i) => {
+                const presentCount = record.findings.filter(f => f.present).length;
+                const topFinding = getTopFinding(record);
+                return (
+                  <div key={record.id} className="flex items-center gap-3 p-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0 text-base">
+                      🫁
                     </div>
-                    <span className="text-sm font-semibold text-gray-800">Uncertainty Analysis</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">Scan #{totalScans - i}</p>
+                      <p className="text-xs text-gray-400">{timeAgo(record.timestamp)}</p>
+                    </div>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                      presentCount === 0
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-red-50 text-red-600"
+                    }`}>
+                      {presentCount === 0 ? "Normal" : topFinding}
+                    </span>
                   </div>
-                  {showChart
-                    ? <ChevronUp size={16} className="text-gray-400" />
-                    : <ChevronDown size={16} className="text-gray-400" />
-                  }
-                </button>
-                <AnimatePresence>
-                  {showChart && (
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: "auto" }}
-                      exit={{ height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-4 pb-4 border-t border-emerald-50">
-                        <div className="pt-4">
-                          <UncertaintyChart findings={results.findings} />
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Report */}
-              {results.report && (
-                <ReportViewer
-                  report={results.report}
-                  inferenceTimeMs={results.inference_time_ms}
-                  modelVersion={results.model_version}
-                />
-              )}
-
-              {/* Disclaimer footer */}
-              <p className="text-center text-xs text-gray-300 pb-4">
-                ChestAI · BioMedCLIP · For research use only · Not FDA cleared
-              </p>
-            </motion.div>
+                );
+              })}
+            </div>
           )}
-        </AnimatePresence>
+        </div>
 
-      </main>
-    </div>
+        <p className="text-center text-xs text-gray-300 pb-2">
+          ChestAI · BioMedCLIP · For research use only · Not FDA cleared
+        </p>
+      </div>
+    </Layout>
   );
 }

@@ -1,10 +1,11 @@
 import type { AppProps } from "next/app";
 import Head from "next/head";
+import { SessionProvider } from "next-auth/react";
 import "@/styles/globals.css";
 
-export default function App({ Component, pageProps }: AppProps) {
+export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
   return (
-    <>
+    <SessionProvider session={session}>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <meta name="theme-color" content="#10b981" />
@@ -14,6 +15,6 @@ export default function App({ Component, pageProps }: AppProps) {
         <title>ChestAI</title>
       </Head>
       <Component {...pageProps} />
-    </>
+    </SessionProvider>
   );
 }

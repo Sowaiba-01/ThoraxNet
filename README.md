@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://chestai-chi.vercel.app"><strong>Live Demo</strong></a> ·
+  <a href="https://thorax-tho.vercel.app"><strong>Live Demo</strong></a> ·
   <a href="https://Sowaiba01-chestai-api.hf.space/docs"><strong>API Docs</strong></a> ·
   <a href="https://huggingface.co/Sowaiba01/chestai-model"><strong>Model Weights</strong></a>
 </p>

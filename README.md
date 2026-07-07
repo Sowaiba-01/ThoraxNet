@@ -1,4 +1,4 @@
-# ThoraxNet — AI Chest X-Ray Diagnostic Platform
+# ThoraxNet: AI Chest X-Ray Diagnostic Platform
 
 
 ThoraxNet is a production-grade, full-stack AI diagnostic platform that detects **14 thoracic pathologies** from chest X-rays. It combines a fine-tuned BioMedCLIP vision-language foundation model with Monte Carlo Dropout uncertainty quantification, ViT-GradCAM explainability, and automated radiology report generation via Groq's LLaMA-3.3-70b.
@@ -29,7 +29,7 @@ Evaluated on the NIH ChestX-ray14 official validation split (224×224 resolution
 | Pneumonia | 0.695 | 0.67 |
 | **Mean** | **0.8215** | — |
 
-Compared to the original NIH paper (Wang et al., 2017) mean AUC of 0.745, ChestAI achieves a **+7.65% absolute improvement** by leveraging BioMedCLIP's medical vision-language pretraining on 15 million biomedical image-text pairs.
+Compared to the original NIH paper (Wang et al., 2017) mean AUC of 0.745, ThoraxNet achieves a **+7.65% absolute improvement** by leveraging BioMedCLIP's medical vision-language pretraining on 15 million biomedical image-text pairs.
 
 ---
 
@@ -293,11 +293,13 @@ ThoraxNet demonstrates that medical vision-language foundation models (BioMedCLI
 If you use ChestAI in your research, please cite:
 
 ```bibtex
-@software{chestai2026,
+@software{thoraxnet2026,
   author    = {Arshad, Sowaiba},
   title     = {ThoraxNet: AI Chest X-Ray Diagnostic Platform with Uncertainty Quantification},
   year      = {2026},
-  url       = {https://github.com/Sowaiba01/ThoraxNet},
+  publisher = {GitHub},
+  journal   = {GitHub Repository},
+  howpublished = {\url{https://github.com/Sowaiba-01/ThoraxNet}}
 }
 ```
 
@@ -313,6 +315,3 @@ If you use ChestAI in your research, please cite:
 
 MIT License — see [LICENSE](LICENSE) for details.
 
----
-
-<p align="center">Built by <a href="https://github.com/Sowaiba01">Sowaiba Arshad</a></p>

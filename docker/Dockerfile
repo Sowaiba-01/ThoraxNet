@@ -1,5 +1,3 @@
-# ── ChestAI API — Production Dockerfile ──────────────────────────────────────
-# Optimized for HuggingFace Spaces (port 7860, runs as non-root user).
 
 FROM python:3.11-slim AS base
 

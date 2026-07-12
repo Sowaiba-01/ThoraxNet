@@ -1,6 +1,3 @@
-"""
-Inference pipeline: image → predictions + GradCAM + report.
-"""
 
 from __future__ import annotations
 

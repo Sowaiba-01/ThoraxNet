@@ -1,18 +1,3 @@
-"""
-Structured radiology report generation via Groq's free LLaMA inference API.
-
-Groq provides free, extremely fast LLaMA 3 70B inference — no credit card
-required. Sign up at https://console.groq.com to get a free API key.
-
-The prompt is carefully engineered to produce:
-  1. A structured FINDINGS section (present/absent per class, with confidence)
-  2. An IMPRESSION section (clinical summary)
-  3. A RECOMMENDATION section (urgency flags)
-
-The model is instructed to stay grounded in the provided data and not hallucinate
-additional findings — critical for any medical-adjacent application.
-"""
-
 from __future__ import annotations
 
 import os

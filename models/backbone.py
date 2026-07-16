@@ -1,15 +1,3 @@
-"""
-Vision backbone: BioMedCLIP ViT-B/16 fine-tuned on medical literature.
-
-Microsoft's BiomedCLIP (https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224)
-is pre-trained on 15M biomedical image-text pairs from PubMed — giving it domain
-knowledge that vanilla ImageNet ViTs lack.
-
-We extract only the vision encoder and expose its patch embeddings for:
-  1. The classification head (see classifier.py)
-  2. GradCAM attention rollout (see explainability/gradcam.py)
-"""
-
 from __future__ import annotations
 
 import torch

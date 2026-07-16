@@ -1,4 +1,3 @@
-"""Unit tests for clinical metrics computation."""
 import numpy as np
 import pytest
 from training.metrics import compute_metrics

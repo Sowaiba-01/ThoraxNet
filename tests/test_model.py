@@ -1,4 +1,4 @@
-"""Unit tests for model architecture and uncertainty estimation."""
+
 import pytest
 import torch
 from models.classifier import ChestAIClassifier

@@ -1,10 +1,6 @@
-
 from __future__ import annotations
-
 import torch
 import torch.nn as nn
-
-
 def enable_dropout(model: nn.Module) -> None:
     """Switch only Dropout layers to train mode (keep BatchNorm in eval mode)."""
     for m in model.modules():

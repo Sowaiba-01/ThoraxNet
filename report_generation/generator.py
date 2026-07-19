@@ -160,7 +160,6 @@ def generate_report_fallback(
         findings = "The following findings were identified: " + "; ".join(present) + "."
         impression = f"Automated analysis suggests {len(present)} potential finding(s) requiring attention."
         recommendation = "Clinical correlation strongly advised. Radiologist review recommended."
-
     return (
         f"FINDINGS:\n{findings}\n\n"
         f"IMPRESSION:\n{impression}\n\n"

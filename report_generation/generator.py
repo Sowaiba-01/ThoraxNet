@@ -16,11 +16,19 @@ additional findings — critical for any medical-adjacent application.
 from __future__ import annotations
 
 import os
-from typing import Optional
-
-from groq import Groq
 
 from data.dataset import CLASSES
+
+# groq is an OPTIONAL dependency. The service degrades to
+# generate_report_fallback() when it is absent or no API key is configured, so
+# importing it at module scope would make the entire inference pipeline
+# unimportable on a machine that only needs the fallback path.
+try:
+    from groq import Groq
+    GROQ_AVAILABLE = True
+except ImportError:  # pragma: no cover - depends on install profile
+    Groq = None  # type: ignore[assignment]
+    GROQ_AVAILABLE = False
 
 
 _SYSTEM_PROMPT = """\
@@ -64,6 +72,12 @@ class RadiologyReportGenerator:
         max_tokens: int = 512,
         temperature: float = 0.2,
     ) -> None:
+        if not GROQ_AVAILABLE:
+            raise RuntimeError(
+                "The 'groq' package is not installed, so LLM report generation is "
+                "unavailable. Install it with `pip install groq`, or use "
+                "generate_report_fallback() for template-based reports."
+            )
         self.client = Groq(api_key=api_key or os.environ["GROQ_API_KEY"])
         self.model = model
         self.max_tokens = max_tokens

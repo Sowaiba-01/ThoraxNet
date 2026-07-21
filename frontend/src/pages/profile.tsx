@@ -141,8 +141,8 @@ export default function ProfilePage() {
           />
           <SettingRow
             icon={<Github size={14} className="text-gray-600" />}
-            iconBg="bg-gray-100" label="GitHub repo" sub="Sowaiba01/chestai"
-            onClick={() => window.open("https://github.com/Sowaiba01/chestai", "_blank")} last
+            iconBg="bg-gray-100" label="GitHub repo" sub="Sowaiba-01/ThoraxNet"
+            onClick={() => window.open("https://github.com/Sowaiba-01/ThoraxNet", "_blank")} last
           />
         </div>
 

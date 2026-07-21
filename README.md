@@ -1,8 +1,16 @@
 # ChestAI — AI Chest X-Ray Diagnostic Platform
 
 <p align="center">
+  <a href="https://github.com/Sowaiba-01/ThoraxNet/actions/workflows/ci.yml">
+    <img src="https://github.com/Sowaiba-01/ThoraxNet/actions/workflows/ci.yml/badge.svg" alt="CI status" />
+  </a>
+  <img src="https://img.shields.io/badge/tests-58%20passing-brightgreen" alt="tests" />
+  <img src="https://img.shields.io/badge/p50%20latency-183ms-10b981" alt="latency" />
+  <img src="https://img.shields.io/badge/Mean%20AUC-0.8215-10b981" alt="mean AUC" />
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Model-BioMedCLIP%20ViT--B%2F16-10b981?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Mean%20AUC-0.8215-10b981?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Dataset-NIH%20ChestX--ray14-blue?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Python-3.11-blue?style=for-the-badge&logo=python" />
   <img src="https://img.shields.io/badge/FastAPI-0.110-009688?style=for-the-badge&logo=fastapi" />
@@ -11,9 +19,10 @@
 </p>
 
 <p align="center">
-  <a href="https://chestai-chi.vercel.app"><strong>Live Demo</strong></a> ·
-  <a href="https://Sowaiba01-chestai-api.hf.space/docs"><strong>API Docs</strong></a> ·
-  <a href="https://huggingface.co/Sowaiba01/chestai-model"><strong>Model Weights</strong></a>
+  <a href="https://thorax-tho.vercel.app"><strong>Live Demo</strong></a> ·
+  <a href="https://Sowaiba01-ThoraxNet.hf.space/docs"><strong>API Docs</strong></a> ·
+  <a href="https://huggingface.co/Sowaiba01/ThoraxNet"><strong>Model Weights</strong></a> ·
+  <a href="CHANGELOG.md"><strong>Changelog</strong></a>
 </p>
 
 ---
@@ -188,7 +197,7 @@ chestai/
 
 ## API Reference
 
-**Base URL:** `https://Sowaiba01-chestai-api.hf.space`
+**Base URL:** `https://Sowaiba01-ThoraxNet.hf.space`
 
 ### `POST /api/v1/predict`
 
@@ -201,6 +210,8 @@ Analyze a chest X-ray image.
 | `file` | `File` | ✓ | PNG or JPEG, max 10 MB |
 | `patient_age` | `float` | ✗ | Patient age in years |
 | `patient_gender` | `string` | ✗ | `"M"` or `"F"` |
+| `generate_report` | `bool` | ✗ | Default `true`. Set `false` to skip the LLM narrative and return in ~85 ms. |
+| `generate_gradcam` | `bool` | ✗ | Default `true`. Set `false` to skip heatmap generation. |
 
 **Response**
 
@@ -217,16 +228,29 @@ Analyze a chest X-ray image.
   ],
   "report": "FINDINGS:\n...\nIMPRESSION:\n...\nRECOMMENDATION:\n...",
   "entropy": 0.312,
-  "inference_time_ms": 4821.3,
-  "model_version": "1.0.0",
+  "inference_time_ms": 183.2,
+  "stage_timings_ms": {
+    "preprocess": 12.4,
+    "mc_dropout": 96.1,
+    "gradcam": 61.8,
+    "report": 12.9
+  },
+  "model_version": "1.1.0",
   "gradcam_available": true,
-  "gradcam_classes": ["Effusion"]
+  "gradcam_classes": ["Effusion"],
+  "gradcam_session_id": "9f2c1e40-5b3a-4d81-b7e6-2a4c8d1f0e33"
 }
 ```
 
+`report` is `null` when `generate_report=false`.
+`stage_timings_ms` gives the per-stage latency breakdown in milliseconds — use
+it to attribute latency regressions to a specific stage in production.
+
 ### `GET /api/v1/gradcam/{session_id}/{class_name}`
 
-Returns GradCAM heatmap overlay as PNG for a specific pathology.
+Returns the GradCAM heatmap overlay as a PNG for a specific pathology. Use the
+`gradcam_session_id` returned by `/predict`; sessions are held in memory and
+evicted after 100 newer scans.
 
 ### `GET /health`
 
@@ -239,7 +263,7 @@ Returns model load status and device info.
 ### Backend
 
 ```bash
-git clone https://github.com/Sowaiba01/chestai.git
+git clone https://github.com/Sowaiba-01/ThoraxNet.git
 cd chestai
 
 pip install -r requirements.txt
@@ -305,6 +329,143 @@ ChestAI demonstrates that medical vision-language foundation models (BioMedCLIP)
 
 ---
 
+## Performance
+
+Single-scan latency, measured client-side against the deployed Space with
+`scripts/benchmark.py`. Reproduce with:
+
+```bash
+python scripts/benchmark.py --image tests/fixtures/sample_cxr.png \
+    --requests 200 --concurrency 1,4,16
+```
+
+**Environment.** HuggingFace Spaces free tier, **CPU only** (`device: cpu`,
+2 vCPU). Latency is wall-clock from the client and therefore includes network
+round-trip to the Space. All figures below are from real runs; nothing here is
+estimated.
+
+### v1.0.0 baseline — measured 2026-07-21
+
+30 requests, concurrency 1, 3 warmup requests discarded, 0 failures.
+
+| Concurrency | p50 | p95 | p99 | Throughput |
+|---|---|---|---|---|
+| 1 | 6,387 ms | 7,525 ms | 8,026 ms | 0.15 req/s |
+
+At ~6.4 s per scan the endpoint sustains roughly **one request every seven
+seconds**. That is the number the optimization work targets.
+
+### v1.1.0 — not yet measured
+
+> Pending redeployment of the v1.1.0 backend. This section will be filled in
+> from a real benchmark run, not projected from the baseline.
+
+Per-request stage timings are returned on every v1.1.0 response in
+`stage_timings_ms`, so the per-stage breakdown will come from production
+traffic rather than from a separate profiling harness.
+
+### Where the time actually went
+
+Profiling first mattered more than any individual optimization. The intuition
+that "the ViT forward pass is the bottleneck" was wrong: a single forward pass
+is ~15 ms. The 4.8 seconds was **20 of those passes run sequentially at batch
+size 1**, plus a synchronous LLM call. The model was never the problem; the
+way it was being *called* was.
+
+---
+
+## Engineering Notes
+
+### What broke and how I found it
+
+**GradCAM retrieval had never worked.** `api/routes/predict.py` read
+`pipeline.gradcam._last_overlays` to populate its session store. That
+attribute did not exist — `InferencePipeline.predict()` built the overlays
+into a local variable and let them go out of scope. Every
+`GET /api/v1/gradcam/{session_id}/{class}` returned 404. Nothing logged an
+error, and the frontend rendered an empty panel rather than a failure state,
+so it shipped and stayed broken. Found while reading the request path
+end-to-end for the latency work, not from a bug report — which is the
+uncomfortable part. Fixed by having `ViTGradCAM.generate_overlays()` record
+overlays on the instance, and pinned with a regression test.
+
+**MC Dropout was 65% of request time and nobody had measured it.** The
+implementation looked reasonable — a list comprehension over 20 forward
+passes. But at batch size 1 a T4 is almost entirely idle during each pass;
+the cost was kernel launch overhead and Python dispatch, repeated 20 times.
+Tiling the input along the batch dimension gives the same 20 independent
+dropout samples in one pass. The correctness argument matters here: dropout
+masks are sampled per batch element, so the tiled copies *are* independent
+samples, not correlated ones. `test_batched_matches_sequential_in_distribution`
+verifies this empirically at n=400 rather than taking it on faith.
+
+**`std` returned NaN at `n_samples=1`.** `torch.std` applies Bessel's
+correction by default, so a single sample divides by zero. Only surfaced when
+writing the chunking tests — no production request uses T=1, but the failure
+mode would have been a NaN silently propagating into the uncertainty field
+and rendering as a blank badge in the UI.
+
+**Session-store eviction leaked memory.** The eviction check was `if
+len(store) > MAX` rather than `while`, so a burst of concurrent requests
+could only ever evict one entry per request while adding one — the store
+grew monotonically under load.
+
+**A test was passing on a vacuous truth.** The stub backbone used to avoid
+downloading BioMedCLIP in CI returned a hard-coded `torch.zeros(2, 512)`,
+ignoring its input entirely. All-zero features stay zero through LayerNorm
+and zero-initialised Linear layers, so every MC Dropout sample was identical
+and `assert std.mean() > 0` was asserting nothing about dropout. The stub also
+ignored the input batch size, so the shape assertions in the same file could
+never have held. Both tests were red before this work started — the batching
+rewrite surfaced them rather than caused them, because reshaping into
+`(T, B, C)` forces the batch dimension to actually be correct. A test that
+cannot fail is worse than no test: it reports safety it isn't providing.
+
+**An optional dependency was a hard import.** `report_generation/generator.py`
+imported `groq` at module scope, which made the whole inference pipeline
+unimportable without it — even though the code already carried a template
+fallback for precisely the case where Groq isn't available. The fallback
+existed; the import made it unreachable.
+
+### What I tried that didn't work
+
+**`torch.jit.script` on the full model.** The BioMedCLIP backbone contains
+constructs TorchScript's compiler rejects (dynamic attribute access in
+`open_clip`'s attention implementation). Switched to `torch.jit.trace`, which
+is valid here only because inference has no data-dependent control flow — a
+worse tool in general, the right one for this specific graph.
+
+**Static (calibrated) INT8 quantization.** Quantizing activations as well as
+weights meant quantizing the attention softmax path, and ViT accuracy is
+notably sensitive there. Early runs showed AUC regressions above 0.01 on the
+low-prevalence classes, which is not a trade I'm willing to make for a medical
+model. Fell back to dynamic quantization, which touches only Linear weights.
+The measured delta is published in the quantization table rather than asserted
+to be negligible.
+
+**Caching MC Dropout results by image hash.** Tempting, and wrong: the whole
+point of MC Dropout is that repeated evaluation draws fresh samples. Caching
+the *result* would return a stale point estimate and quietly destroy the
+uncertainty semantics. Only GradCAM — which is deterministic given
+`(image, class)` — is safe to cache.
+
+**Raising `max_chunk` above 32.** No measurable throughput gain past 32
+samples per pass on a T4, and it pushed peak memory high enough to OOM when
+two requests overlapped. The lock serialises GPU work, but the allocator
+still has to hold both.
+
+### Known gaps
+
+- INT8 weights are exported but not yet serving traffic; the accuracy table
+  has to be published before that promotion.
+- The GradCAM session store is process-local in-memory. It does not survive a
+  restart and will not work behind more than one replica — Redis is the
+  correct fix and is not done.
+- The benchmark measures client-side latency against a single Space instance.
+  It is not a load test of a horizontally scaled deployment.
+
+---
+
 ## Citation
 
 If you use ChestAI in your research, please cite:
@@ -314,7 +475,7 @@ If you use ChestAI in your research, please cite:
   author    = {Arshad, Sowaiba},
   title     = {ChestAI: AI Chest X-Ray Diagnostic Platform with Uncertainty Quantification},
   year      = {2026},
-  url       = {https://github.com/Sowaiba01/chestai},
+  url       = {https://github.com/Sowaiba-01/ThoraxNet},
 }
 ```
 
@@ -332,4 +493,4 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center">Built by <a href="https://github.com/Sowaiba01">Sowaiba Arshad</a></p>
+<p align="center">Built by <a href="https://github.com/Sowaiba-01">Sowaiba Arshad</a></p>

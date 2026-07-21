@@ -12,6 +12,8 @@ References:
 
 from __future__ import annotations
 
+import hashlib
+from collections import OrderedDict
 from typing import Optional
 
 import cv2
@@ -19,8 +21,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from PIL import Image
-
-from data.transforms import denormalize
 
 
 class ViTGradCAM:
@@ -37,12 +37,41 @@ class ViTGradCAM:
         overlay_pil = cam.overlay(original_pil, heatmap_pil)
     """
 
-    def __init__(self, model: nn.Module) -> None:
+    def __init__(self, model: nn.Module, cache_size: int = 128) -> None:
         self.model = model
         self._activations: torch.Tensor | None = None
         self._gradients: torch.Tensor | None = None
         self._hook_handles: list = []
+        # Overlays produced by the most recent generate_overlays() call.
+        # api/routes/predict.py reads this to populate its session store.
+        self._last_overlays: dict[str, Image.Image] = {}
+        # LRU cache: (image_sha1, class_idx) -> heatmap. GradCAM requires a
+        # full backward pass per class, so repeat uploads of the same study
+        # (common in demos and in retry-after-timeout) are worth caching.
+        self._cache: "OrderedDict[tuple[str, int], np.ndarray]" = OrderedDict()
+        self._cache_size = cache_size
+        self.cache_hits = 0
+        self.cache_misses = 0
         self._register_hooks()
+
+    @staticmethod
+    def image_key(image_bytes: bytes) -> str:
+        """Stable cache key for a raw uploaded image."""
+        return hashlib.sha1(image_bytes).hexdigest()
+
+    def _cache_get(self, key: tuple[str, int]) -> Optional[np.ndarray]:
+        if key in self._cache:
+            self._cache.move_to_end(key)
+            self.cache_hits += 1
+            return self._cache[key]
+        self.cache_misses += 1
+        return None
+
+    def _cache_put(self, key: tuple[str, int], value: np.ndarray) -> None:
+        self._cache[key] = value
+        self._cache.move_to_end(key)
+        while len(self._cache) > self._cache_size:
+            self._cache.popitem(last=False)
 
     def _register_hooks(self) -> None:
         """Hook into the last ViT transformer block."""
@@ -142,6 +171,65 @@ class ViTGradCAM:
 
         blended = cv2.addWeighted(orig_resized, 1 - alpha, colored, alpha, 0)
         return Image.fromarray(blended)
+
+    def generate_cached(
+        self,
+        image_tensor: torch.Tensor,
+        class_idx: int,
+        image_key: Optional[str] = None,
+        image_size: int = 224,
+    ) -> np.ndarray:
+        """
+        generate() with an LRU cache keyed on (image_key, class_idx).
+
+        Pass image_key=ViTGradCAM.image_key(raw_bytes) to enable caching.
+        Without a key this falls straight through to generate().
+        """
+        if image_key is None:
+            return self.generate(image_tensor, class_idx, image_size=image_size)
+
+        key = (image_key, class_idx)
+        hit = self._cache_get(key)
+        if hit is not None:
+            return hit
+
+        cam = self.generate(image_tensor, class_idx, image_size=image_size)
+        self._cache_put(key, cam)
+        return cam
+
+    def generate_overlays(
+        self,
+        image_tensor: torch.Tensor,
+        original_pil: Image.Image,
+        class_names: list[str],
+        image_key: Optional[str] = None,
+        image_size: int = 224,
+    ) -> dict[str, Image.Image]:
+        """
+        Produce blended overlays for the given class names and record them on
+        self._last_overlays so the API layer can serve them by session id.
+        """
+        from data.dataset import CLASSES
+
+        overlays: dict[str, Image.Image] = {}
+        for cls_name in class_names:
+            cls_idx = CLASSES.index(cls_name)
+            heatmap = self.generate_cached(
+                image_tensor, cls_idx, image_key=image_key, image_size=image_size
+            )
+            overlays[cls_name] = self.overlay(original_pil, heatmap)
+
+        self._last_overlays = overlays
+        return overlays
+
+    def cache_stats(self) -> dict[str, int | float]:
+        total = self.cache_hits + self.cache_misses
+        return {
+            "hits": self.cache_hits,
+            "misses": self.cache_misses,
+            "size": len(self._cache),
+            "hit_rate": round(self.cache_hits / total, 4) if total else 0.0,
+        }
 
     def generate_all_classes(
         self,

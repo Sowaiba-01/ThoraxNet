@@ -7,13 +7,34 @@ from models.uncertainty import mc_predict, enable_dropout
 
 @pytest.fixture(scope="module")
 def model():
-    """Lightweight model for testing — skip backbone download in CI."""
+    """
+    Lightweight model for testing — skips the BioMedCLIP download in CI.
+
+    The stub backbone must honour the input batch size. An earlier version
+    returned a hard-coded `torch.zeros(2, 512)` regardless of what it was
+    given, which meant:
+
+      * the batch dimension was silently wrong for any input that wasn't
+        batch-2, so shape assertions in these tests could never hold; and
+      * all-zero features propagate as zeros through LayerNorm -> Linear
+        (biases are zero-initialised), so dropout produced no variance at all
+        and the uncertainty assertions were vacuous.
+
+    The stub below returns fixed, non-zero features shaped to the input batch,
+    so the only source of variance across MC passes is dropout — which is
+    precisely what these tests are meant to measure.
+    """
     import unittest.mock as mock
-    # Mock the BioMedCLIP download for fast CI runs
+
+    _FIXED_FEATURES = torch.randn(1, 512, generator=torch.Generator().manual_seed(0))
+
+    def fake_visual(x: torch.Tensor) -> torch.Tensor:
+        # (B, 3, H, W) -> (B, 512), identical features for every call.
+        return _FIXED_FEATURES.expand(x.shape[0], 512).clone()
+
     with mock.patch("models.backbone.create_model_from_pretrained") as m:
-        mock_visual = mock.MagicMock()
+        mock_visual = mock.MagicMock(side_effect=fake_visual)
         mock_visual.output_dim = 512
-        mock_visual.return_value = torch.zeros(2, 512)
         m.return_value = (mock.MagicMock(visual=mock_visual), None)
         clf = ChestAIClassifier(num_classes=14, freeze_backbone=False)
     return clf

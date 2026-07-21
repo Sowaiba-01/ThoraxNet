@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-from open_clip import create_model_from_pretrained, get_tokenizer
+from open_clip import create_model_from_pretrained
 
 
 class BioMedCLIPVisionBackbone(nn.Module):

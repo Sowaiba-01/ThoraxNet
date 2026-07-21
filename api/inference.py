@@ -8,9 +8,7 @@ import asyncio
 import io
 import os
 import time
-from pathlib import Path
 
-import numpy as np
 import torch
 from PIL import Image
 
@@ -18,7 +16,11 @@ from data.transforms import build_transforms
 from models.classifier import ChestAIClassifier
 from models.uncertainty import mc_predict
 from explainability.gradcam import ViTGradCAM
-from report_generation.generator import RadiologyReportGenerator, generate_report_fallback
+from report_generation.generator import (
+    GROQ_AVAILABLE,
+    RadiologyReportGenerator,
+    generate_report_fallback,
+)
 from api.schemas import FindingResult, PredictionResponse
 from data.dataset import CLASSES
 
@@ -42,7 +44,8 @@ class InferencePipeline:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.transform = build_transforms("val", image_size=224)
         self._lock = asyncio.Lock()
-        self.model_version = "1.0.0"
+        self.model_version = "1.1.0"
+        self.mc_samples = int(os.environ.get("MC_SAMPLES", "20"))
 
     async def load(self) -> None:
         from huggingface_hub import hf_hub_download
@@ -72,44 +75,105 @@ class InferencePipeline:
         self.gradcam = ViTGradCAM(self.model)
 
         groq_key = os.environ.get("GROQ_API_KEY")
-        if groq_key:
+        if groq_key and GROQ_AVAILABLE:
             self.report_gen = RadiologyReportGenerator(api_key=groq_key)
             print("[Pipeline] Groq report generator initialized.")
+        elif groq_key and not GROQ_AVAILABLE:
+            print("[Pipeline] GROQ_API_KEY is set but the 'groq' package is not "
+                  "installed — using fallback report generator.")
         else:
             print("[Pipeline] GROQ_API_KEY not set — using fallback report generator.")
 
         print(f"[Pipeline] Model loaded on {self.device}.")
+
+    async def _build_report(
+        self,
+        mean_probs,
+        std_probs,
+        patient_info: dict,
+    ) -> str:
+        """
+        Generate the narrative report WITHOUT blocking the event loop.
+
+        RadiologyReportGenerator.generate() is a synchronous network call to
+        Groq (~1.2-1.8s). Awaiting it directly inside an async handler blocks
+        the loop and serialises every concurrent request behind it, which is
+        why p95 collapsed under load before this change. asyncio.to_thread
+        moves it to the default executor.
+        """
+        def _sync() -> str:
+            try:
+                if self.report_gen:
+                    return self.report_gen.generate(
+                        probs=mean_probs.tolist(),
+                        stds=std_probs.tolist(),
+                        patient_info=patient_info or None,
+                    )
+                return generate_report_fallback(mean_probs.tolist(), std_probs.tolist())
+            except Exception as e:  # noqa: BLE001 - never fail a scan on report error
+                print(f"[Pipeline] Report generation failed: {e}")
+                return generate_report_fallback(mean_probs.tolist(), std_probs.tolist())
+
+        return await asyncio.to_thread(_sync)
 
     async def predict(
         self,
         image_bytes: bytes,
         patient_age: float | None = None,
         patient_gender: str | None = None,
+        generate_report: bool = True,
+        generate_gradcam: bool = True,
     ) -> PredictionResponse:
+        """
+        Full inference: preprocess → MC dropout → GradCAM → report.
+
+        Set generate_report=False or generate_gradcam=False to skip those
+        stages; both are optional and neither affects the pathology
+        probabilities. See stage_timings_ms on the response for a per-stage
+        breakdown.
+        """
         if self.model is None:
             raise RuntimeError("Model not loaded. Call await pipeline.load() first.")
 
         t0 = time.perf_counter()
+        stage: dict[str, float] = {}
+
+        def _mark(name: str, start: float) -> float:
+            now = time.perf_counter()
+            stage[name] = round((now - start) * 1000, 1)
+            return now
 
         pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         tensor = self.transform(pil_image).unsqueeze(0).to(self.device)
+        t_pre = _mark("preprocess", t0)
 
+        image_key = ViTGradCAM.image_key(image_bytes)
+
+        # The model itself is not re-entrant (MC dropout toggles module state,
+        # GradCAM mutates hook buffers), so GPU work stays under the lock.
         async with self._lock:
-            mc_results = mc_predict(self.model, tensor, n_samples=20)
+            mc_results = mc_predict(self.model, tensor, n_samples=self.mc_samples)
             mean_probs = mc_results["mean"][0].cpu().numpy()
             std_probs  = mc_results["std"][0].cpu().numpy()
             entropy    = float(mc_results["entropy"][0].item())
+            t_mc = _mark("mc_dropout", t_pre)
 
             gradcam_classes = [
                 cls for cls, p in zip(CLASSES, mean_probs)
                 if p >= THRESHOLDS.get(cls, 0.5)
             ]
-            gradcam_images = {}
-            for cls_name in gradcam_classes:
-                cls_idx = CLASSES.index(cls_name)
-                heatmap = self.gradcam.generate(tensor, cls_idx)
-                overlay = self.gradcam.overlay(pil_image, heatmap)
-                gradcam_images[cls_name] = overlay
+
+            if generate_gradcam and gradcam_classes:
+                self.gradcam.generate_overlays(
+                    tensor,
+                    pil_image,
+                    gradcam_classes,
+                    image_key=image_key,
+                )
+            else:
+                self.gradcam._last_overlays = {}
+                gradcam_classes = [] if not generate_gradcam else gradcam_classes
+            t_cam = _mark("gradcam", t_mc)
 
         findings = [
             FindingResult(
@@ -128,18 +192,11 @@ class InferencePipeline:
         if patient_gender is not None:
             patient_info["gender"] = patient_gender
 
-        try:
-            if self.report_gen:
-                report = self.report_gen.generate(
-                    probs=mean_probs.tolist(),
-                    stds=std_probs.tolist(),
-                    patient_info=patient_info or None,
-                )
-            else:
-                report = generate_report_fallback(mean_probs.tolist(), std_probs.tolist())
-        except Exception as e:
-            print(f"[Pipeline] Report generation failed: {e}")
-            report = generate_report_fallback(mean_probs.tolist(), std_probs.tolist())
+        if generate_report:
+            report = await self._build_report(mean_probs, std_probs, patient_info)
+        else:
+            report = None
+        _mark("report", t_cam)
 
         elapsed_ms = (time.perf_counter() - t0) * 1000
 
@@ -147,9 +204,10 @@ class InferencePipeline:
             findings=findings,
             entropy=entropy,
             report=report,
-            gradcam_available=bool(gradcam_classes),
+            gradcam_available=bool(generate_gradcam and gradcam_classes),
             gradcam_classes=gradcam_classes,
             inference_time_ms=round(elapsed_ms, 1),
+            stage_timings_ms=stage,
             model_version=self.model_version,
         )
 

@@ -20,3 +20,9 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+# Put the repo root on sys.path so `from models... import ...` resolves without
+# installing the project. Bare `pytest` does NOT add the working directory to
+# sys.path (only `python -m pytest` does), so without this the suite passes
+# locally and fails in CI purely on invocation style.
+pythonpath = ["."]

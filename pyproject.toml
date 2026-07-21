@@ -1,13 +1,11 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.backends.legacy:build"
-
 [project]
 name = "chestai"
 version = "1.0.0"
 description = "Uncertainty-aware chest X-ray diagnostic AI"
 requires-python = ">=3.11"
-
 [tool.ruff]
 line-length = 100
 target-version = "py311"
@@ -19,7 +17,6 @@ extend-exclude = ["notebooks", ".venv", "export"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

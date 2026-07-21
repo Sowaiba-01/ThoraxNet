@@ -1,27 +1,6 @@
-"""
-Monte Carlo Dropout uncertainty estimation.
-
-Standard neural networks output a single point estimate with no calibrated
-confidence. MC Dropout treats dropout as approximate Bayesian inference:
-running T stochastic forward passes samples from the model's posterior.
-
-Result:
-    mean_prob  — the ensemble prediction (more reliable than a single pass)
-    std_prob   — per-class uncertainty (high std = model is uncertain)
-    entropy    — total predictive uncertainty across all classes
-
-Clinical interpretation:
-    - mean_prob > 0.5  → finding likely present
-    - std_prob > 0.15  → borderline — flag for radiologist review
-    - entropy > 2.0    → overall scan is ambiguous
-"""
-
 from __future__ import annotations
-
 import torch
 import torch.nn as nn
-
-
 def enable_dropout(model: nn.Module) -> None:
     """Switch only Dropout layers to train mode (keep BatchNorm in eval mode)."""
     for m in model.modules():

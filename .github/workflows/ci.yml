@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-# Cancel superseded runs on the same branch — saves free-tier minutes.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -40,24 +39,7 @@ jobs:
         run: ruff check . --select=E,F,W --ignore=E501
 
       - name: Run tests
-        run: pytest tests/ -v --tb=short --cov=. --cov-report=term-missing --junitxml=junit.xml
-
-      - name: Publish test summary
-        if: always()
-        run: |
-          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import xml.etree.ElementTree as ET, pathlib
-          p = pathlib.Path("junit.xml")
-          if not p.exists():
-              print("No test report produced."); raise SystemExit
-          r = ET.parse(p).getroot()
-          s = r if r.tag == "testsuite" else r.find("testsuite")
-          total = int(s.get("tests", 0)); fail = int(s.get("failures", 0))
-          err = int(s.get("errors", 0)); skip = int(s.get("skipped", 0))
-          print(f"### Tests: {total - fail - err - skip}/{total} passed")
-          print("")
-          print(f"- failures: {fail}\n- errors: {err}\n- skipped: {skip}")
-          PY
+        run: pytest tests/ -v --tb=short --junitxml=junit.xml
 
       - name: Upload test results
         if: always()

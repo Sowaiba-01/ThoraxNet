@@ -1,13 +1,3 @@
-"""
-Multi-label classification head with MC Dropout.
-
-Architecture:
-    BioMedCLIP ViT-B/16 → LayerNorm → Dropout → Linear(512, 256)
-                        → GELU → Dropout → Linear(256, 14)
-
-The double-dropout design enables Monte Carlo uncertainty estimation at
-inference time by keeping dropout active (model.train() mode).
-"""
 
 from __future__ import annotations
 

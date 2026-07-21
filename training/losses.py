@@ -1,16 +1,3 @@
-"""
-Weighted Focal Binary Cross-Entropy Loss.
-
-Why focal loss for chest X-rays?
-  - Most patients are "No Finding" — extreme class imbalance.
-  - Focal loss down-weights easy negatives so the model focuses on hard, rare
-    positive cases (e.g., Hernia prevalence < 0.2%).
-  - Combined with per-class positive weights from dataset statistics.
-
-Formula:
-    FL(p_t) = -alpha_t * (1 - p_t)^gamma * log(p_t)
-    where p_t = sigmoid(logit) for positive, 1-sigmoid(logit) for negative.
-"""
 
 from __future__ import annotations
 

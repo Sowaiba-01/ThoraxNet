@@ -1,17 +1,3 @@
-"""
-Clinical evaluation metrics for multi-label chest X-ray classification.
-
-Metrics reported (per class and macro-average):
-  - AUC-ROC   : primary leaderboard metric (standard for CheXpert/NIH)
-  - Sensitivity (Recall): true positive rate — critical for screening
-  - Specificity: true negative rate
-  - PPV (Precision): positive predictive value
-  - NPV: negative predictive value
-  - F1: harmonic mean of precision and recall
-  - AP: average precision (area under PR curve)
-
-All computed with sklearn for correctness against published baselines.
-"""
 
 from __future__ import annotations
 

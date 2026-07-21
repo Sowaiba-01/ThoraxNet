@@ -1,5 +1,3 @@
-# ── ChestAI API — Production Dockerfile ──────────────────────────────────────
-# Optimized for HuggingFace Spaces (port 7860, runs as non-root user).
 
 FROM python:3.11-slim AS base
 
@@ -13,7 +11,6 @@ WORKDIR /app
 # ── Install Python deps ───────────────────────────────────────────────────────
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
 # ── Copy source ───────────────────────────────────────────────────────────────
 COPY configs/ ./configs/
 COPY data/     ./data/
@@ -23,7 +20,6 @@ COPY explainability/ ./explainability/
 COPY fairness/ ./fairness/
 COPY report_generation/ ./report_generation/
 COPY api/      ./api/
-
 # ── Non-root user (HF Spaces requirement) ────────────────────────────────────
 RUN useradd -m -u 1000 appuser && chown -R appuser /app
 USER appuser

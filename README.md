@@ -5,7 +5,6 @@
     <img src="https://github.com/Sowaiba-01/ThoraxNet/actions/workflows/ci.yml/badge.svg" alt="CI status" />
   </a>
   <img src="https://img.shields.io/badge/tests-58%20passing-brightgreen" alt="tests" />
-  <img src="https://img.shields.io/badge/p50%20latency-183ms-10b981" alt="latency" />
   <img src="https://img.shields.io/badge/Mean%20AUC-0.8215-10b981" alt="mean AUC" />
 </p>
 
@@ -25,9 +24,8 @@
   <a href="CHANGELOG.md"><strong>Changelog</strong></a>
 </p>
 
----
 
-ChestAI is a production-grade, full-stack AI diagnostic platform that detects **14 thoracic pathologies** from chest X-rays. It combines a fine-tuned BioMedCLIP vision-language foundation model with Monte Carlo Dropout uncertainty quantification, ViT-GradCAM explainability, and automated radiology report generation via Groq's LLaMA-3.3-70b.
+ThoraxNet is a production-grade, full-stack AI diagnostic platform that detects **14 thoracic pathologies** from chest X-rays. It combines a fine-tuned BioMedCLIP vision-language foundation model with Monte Carlo Dropout uncertainty quantification, ViT-GradCAM explainability, and automated radiology report generation via Groq's LLaMA-3.3-70b.
 
 > **For research use only. Not FDA cleared. Not a substitute for clinical radiologist interpretation.**
 
@@ -55,7 +53,7 @@ Evaluated on the NIH ChestX-ray14 official validation split (224×224 resolution
 | Pneumonia | 0.695 | 0.67 |
 | **Mean** | **0.8215** | — |
 
-Compared to the original NIH paper (Wang et al., 2017) mean AUC of 0.745, ChestAI achieves a **+7.65% absolute improvement** by leveraging BioMedCLIP's medical vision-language pretraining on 15 million biomedical image-text pairs.
+Compared to the original NIH paper (Wang et al., 2017) mean AUC of 0.745, ThoraxNet achieves a **+7.65% absolute improvement** by leveraging BioMedCLIP's medical vision-language pretraining on 15 million biomedical image-text pairs.
 
 ---
 
@@ -147,7 +145,7 @@ Compared to the original NIH paper (Wang et al., 2017) mean AUC of 0.745, ChestA
 ## Project Structure
 
 ```
-chestai/
+ThoraxNet/
 ├── api/                        # FastAPI backend
 │   ├── main.py                 # App entrypoint, CORS, lifespan
 │   ├── inference.py            # InferencePipeline singleton
@@ -320,7 +318,7 @@ Required environment variables in Vercel dashboard:
 
 ## Results & Discussion
 
-ChestAI demonstrates that medical vision-language foundation models (BioMedCLIP) significantly outperform task-specific CNN architectures on chest X-ray multi-label classification when fine-tuned with appropriate regularization. Key observations:
+ThoraxNet demonstrates that medical vision-language foundation models (BioMedCLIP) significantly outperform task-specific CNN architectures on chest X-ray multi-label classification when fine-tuned with appropriate regularization. Key observations:
 
 - **Cardiomegaly** achieves the highest AUC (0.888) due to its distinct visual morphology
 - **Pneumonia** is the hardest class (AUC 0.695), consistent with literature — its appearance overlaps heavily with Consolidation and Infiltration
@@ -471,9 +469,9 @@ still has to hold both.
 If you use ChestAI in your research, please cite:
 
 ```bibtex
-@software{chestai2026,
+@software{thoraxnet2026,
   author    = {Arshad, Sowaiba},
-  title     = {ChestAI: AI Chest X-Ray Diagnostic Platform with Uncertainty Quantification},
+  title     = {ThoraxNet: AI Chest X-Ray Diagnostic Platform with Uncertainty Quantification},
   year      = {2026},
   url       = {https://github.com/Sowaiba-01/ThoraxNet},
 }

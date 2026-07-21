@@ -79,9 +79,12 @@ def compute_metrics(
         results[f"{prefix}{cls}/npv"]         = npv
         results[f"{prefix}{cls}/f1"]          = f1
 
-        aucs.append(auc); aps.append(ap)
-        sens_list.append(sensitivity); spec_list.append(specificity)
-        ppv_list.append(ppv); npv_list.append(npv)
+        aucs.append(auc)
+        aps.append(ap)
+        sens_list.append(sensitivity)
+        spec_list.append(specificity)
+        ppv_list.append(ppv)
+        npv_list.append(npv)
         f1_list.append(f1)
 
     # Macro averages (headline metrics for W&B and README).
@@ -105,9 +108,8 @@ def metrics_dataframe(metrics: dict[str, float]) -> pd.DataFrame:
     """
     rows = []
     for cls in CLASSES:
-        prefix_cls = f"{cls}/"
-        keys = [k for k in metrics if k.endswith(f"/{cls}/auc") or k == f"{cls}/auc"]
-        # Try to extract prefix from first found key.
+        # Metric keys may carry a split prefix ("val/", "test/") or none at all.
+        # Recover it from the first matching key so lookups below work either way.
         p = ""
         for k in metrics:
             if k.endswith(f"{cls}/auc"):

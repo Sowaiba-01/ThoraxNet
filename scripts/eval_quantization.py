@@ -159,8 +159,8 @@ def main() -> None:
         print("\n[bench] timing both models (batch=20, CPU) ...")
         t_fp32 = benchmark_session(ort.InferenceSession(args.fp32, providers=providers))
         t_int8 = benchmark_session(ort.InferenceSession(args.int8, providers=providers))
-        print(f"| Model | ms / batch-20 forward | Speedup |")
-        print(f"|---|---|---|")
+        print("| Model | ms / batch-20 forward | Speedup |")
+        print("|---|---|---|")
         print(f"| FP32 | {t_fp32:.1f} | 1.00x |")
         print(f"| INT8 | {t_int8:.1f} | {t_fp32 / t_int8:.2f}x |")
         result["bench"] = {"fp32_ms": t_fp32, "int8_ms": t_int8, "speedup": t_fp32 / t_int8}

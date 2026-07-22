@@ -53,7 +53,12 @@ class RadiologyReportGenerator:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "llama3-70b-8192",
+        # llama3-70b-8192 was decommissioned by Groq (2026); requests to it
+        # return HTTP 400 model_decommissioned and every report silently fell
+        # back to the template. llama-3.3-70b-versatile is the current
+        # equivalent. Overridable via the GROQ_MODEL env var so the next
+        # deprecation is a config change, not a code change.
+        model: str = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
         max_tokens: int = 512,
         temperature: float = 0.2,
     ) -> None:

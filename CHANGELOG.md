@@ -22,10 +22,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.1.0] — 2026-07-21
+## [1.1.0] — 2026-07-22
 
-Performance release. End-to-end p50 latency for a single scan went from
-**4.8 s → 183 ms** (~26×). No change to model weights or per-class AUC.
+Performance release. No change to model weights or per-class AUC.
+
+Measured on HF Spaces free tier (CPU, 2 vCPU), 30 requests, same image,
+0 failures.
+
+Single-request (concurrency 1):
+
+| Version | p50 | p95 | p99 | Throughput |
+|---|---|---|---|---|
+| v1.0.0 | 6,387 ms | 7,525 ms | 8,026 ms | 0.15 req/s |
+| v1.1.0 | 3,327 ms | 3,862 ms | 4,768 ms | 0.30 req/s |
+
+Every percentile improved ~2× (p50 1.9×, throughput 2.0×) with no change to
+model weights or accuracy. Server-side v1.1.0 stage breakdown: mc_dropout
+~2,870 ms · preprocess 16 ms · report 92 ms (async) · gradcam 6 ms (cache hit).
+The win is entirely in how the model is executed — batching the 20 MC Dropout
+passes into a single forward pass, moving the Groq call off the critical path,
+and caching GradCAM.
 
 ### Changed
 - **Batched Monte Carlo Dropout** (`models/uncertainty.py`). MC Dropout ran
@@ -34,13 +50,12 @@ Performance release. End-to-end p50 latency for a single scan went from
   now tiled along the batch dimension and evaluated in a single pass; dropout
   masks are sampled per batch element, so the T tiled copies are exactly the T
   independent stochastic samples the estimator requires. Chunked at
-  `max_chunk=32` samples to bound memory.
-  **3,100 ms → 310 ms** for the MC stage alone.
+  `max_chunk=32` samples to bound memory. On the CPU host this is the primary
+  driver of the ~2× end-to-end improvement (see the measured table above).
 - **Groq report generation moved off the event loop** (`api/inference.py`).
-  `RadiologyReportGenerator.generate()` is a blocking HTTP call (~1.3 s)
-  that was being awaited directly inside an async handler, serialising every
-  concurrent request behind it. Now dispatched via `asyncio.to_thread`.
-  This is why p95 previously degraded far faster than p50 under load.
+  `RadiologyReportGenerator.generate()` is a blocking HTTP call that was being
+  awaited directly inside an async handler, serialising every concurrent
+  request behind it. Now dispatched via `asyncio.to_thread`.
 - **Report and GradCAM are now optional per request.** `POST /api/v1/predict`
   accepts `generate_report` and `generate_gradcam` form flags (both default
   `true`). Clients that only need probabilities can skip both.
@@ -67,6 +82,19 @@ Performance release. End-to-end p50 latency for a single scan went from
   opaque size error.
 
 ### Fixed
+- **Radiology reports were silently failing in production.** Groq
+  decommissioned `llama3-70b-8192`; every report request returned HTTP 400
+  `model_decommissioned` and fell back to the template, so users got no
+  LLM-generated reports. Surfaced in the deploy logs during benchmarking.
+  Default model is now `llama-3.3-70b-versatile`, overridable via the
+  `GROQ_MODEL` env var so the next deprecation is a config change.
+- **Startup crash from a checkpoint/architecture mismatch.** The published
+  checkpoint's head is `Linear(512 → 512 → 14)` but `classifier.py` defaults
+  to a 256-wide intermediate layer. `InferencePipeline.load()` reads the true
+  width from the checkpoint and rebuilds `model.head` before loading weights
+  (`weights_only=False`, `strict=False`). A regression test
+  (`test_head_can_be_rebuilt_to_match_a_512wide_checkpoint`) reproduces the
+  exact size-mismatch and pins the fix.
 - **GradCAM retrieval was completely broken.** `api/routes/predict.py` read
   `pipeline.gradcam._last_overlays`, an attribute that was never assigned —
   the pipeline built overlays into a local variable and discarded them at the

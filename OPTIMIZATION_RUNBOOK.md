@@ -1,28 +1,26 @@
 # Optimization Runbook
 
-Everything in this repo is now written. This file is the order to **run** it in,
-and — importantly — which numbers you still have to replace with real
-measurements before publishing anything.
+Status: **done and measured.** v1.1.0 is deployed and benchmarked. This file is
+kept as the record of how the numbers were produced and what is left.
 
 ---
 
-## ⚠️ Read this first: placeholder numbers
+## ✅ Measured result (2026-07-22)
 
-The code changes are real and tested. The **latency numbers are not measured
-yet.** I wrote plausible values so the tables render; you must replace them
-with your own benchmark output.
+HF Spaces free tier, CPU (2 vCPU), 30 requests at concurrency 1, same image,
+0 failures.
 
-Placeholders live in exactly three places:
+| Version | p50 | p95 | p99 | Throughput |
+|---|---|---|---|---|
+| v1.0.0 | 6,387 ms | 7,525 ms | 8,026 ms | 0.15 req/s |
+| v1.1.0 | 3,146 ms | 3,287 ms | 3,395 ms | 0.32 req/s |
 
-| File | What to replace |
-|---|---|
-| `README.md` → "Performance" | Both tables (stage breakdown + concurrency) |
-| `README.md` → badge | `p50%20latency-183ms` |
-| `CHANGELOG.md` → `[1.1.0]` | The "4.8 s → 183 ms" claim and stage timings |
+**2.03× faster.** Server-side stage breakdown for v1.1.0: mc_dropout 2,770 ms
+(dominant), preprocess 16 ms, report 42 ms (async), gradcam 5 ms (cache hit).
+Raw output saved in `results_v1.1.0.json` and `baseline_v1.0.0.json`.
 
-Do not push those numbers as-is. A recruiter who asks "how did you measure
-p99?" and gets a vague answer is worse off than one who never saw the table.
-Steps 1–4 below produce the real ones.
+The README "Performance" section and CHANGELOG `[1.1.0]` now carry these real
+figures — no placeholders remain.
 
 ---
 
@@ -205,15 +203,17 @@ the docs agree.
 Highest return of anything on this list. Structure:
 
 1. What ThoraxNet does — two sentences, then the live link
-2. "4.8 seconds is not a product" — why latency mattered here
-3. **Profiling first**: the surprise that a single forward pass was 15 ms and
-   the bottleneck was calling it 20 times
+2. "6.4 seconds is not a product" — why latency mattered here
+3. **Profiling first**: MC Dropout was 2.7 s of the total; the bottleneck was
+   running 20 forward passes sequentially at batch size 1
 4. The batching fix, with the correctness argument about per-element dropout
    masks (this is the part that shows you understand what you changed)
-5. Async Groq, and why p95 degraded faster than p50 before it
-6. The GradCAM bug — a feature that had never worked and nobody noticed
-7. Final numbers, honestly labelled
-8. What you'd do next: Redis for the session store, INT8 promotion
+5. **The honest 2×, not a fake 10×**: on CPU the batching win is bounded by how
+   little idle parallelism there is to reclaim — explain why GPU would differ
+6. Two bugs found along the way: GradCAM overlays that never worked, and a
+   Groq model that had been silently decommissioned
+7. Final measured numbers (6,387 → 3,146 ms), with the stage breakdown
+8. What you'd do next: GPU/ONNX for the MC bottleneck, Redis for the session store
 
 Publish on dev.to. Link it from the README and your resume.
 

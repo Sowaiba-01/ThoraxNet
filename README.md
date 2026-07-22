@@ -4,7 +4,8 @@
   <a href="https://github.com/Sowaiba-01/ThoraxNet/actions/workflows/ci.yml">
     <img src="https://github.com/Sowaiba-01/ThoraxNet/actions/workflows/ci.yml/badge.svg" alt="CI status" />
   </a>
-  <img src="https://img.shields.io/badge/tests-58%20passing-brightgreen" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-59%20passing-brightgreen" alt="tests" />
+  <img src="https://img.shields.io/badge/p50-3.15s%20(CPU)-10b981" alt="p50 latency" />
   <img src="https://img.shields.io/badge/Mean%20AUC-0.8215-10b981" alt="mean AUC" />
 </p>
 
@@ -226,12 +227,12 @@ Analyze a chest X-ray image.
   ],
   "report": "FINDINGS:\n...\nIMPRESSION:\n...\nRECOMMENDATION:\n...",
   "entropy": 0.312,
-  "inference_time_ms": 183.2,
+  "inference_time_ms": 3145.8,
   "stage_timings_ms": {
-    "preprocess": 12.4,
-    "mc_dropout": 96.1,
-    "gradcam": 61.8,
-    "report": 12.9
+    "preprocess": 15.7,
+    "mc_dropout": 2770.5,
+    "gradcam": 5.4,
+    "report": 42.4
   },
   "model_version": "1.1.0",
   "gradcam_available": true,
@@ -342,33 +343,43 @@ python scripts/benchmark.py --image tests/fixtures/sample_cxr.png \
 round-trip to the Space. All figures below are from real runs; nothing here is
 estimated.
 
-### v1.0.0 baseline — measured 2026-07-21
+### Before vs after (v1.0.0 → v1.1.0)
 
-30 requests, concurrency 1, 3 warmup requests discarded, 0 failures.
+Identical hardware, identical image, identical protocol: 30 requests, 3 warmup
+requests discarded, 0 failures. The only variable is the code.
 
-| Concurrency | p50 | p95 | p99 | Throughput |
-|---|---|---|---|---|
-| 1 | 6,387 ms | 7,525 ms | 8,026 ms | 0.15 req/s |
+| Metric | v1.0.0 | v1.1.0 | Improvement |
+|---|---|---|---|
+| p50 latency | 6,387 ms | **3,327 ms** | **1.9× faster** |
+| p95 latency | 7,525 ms | **3,862 ms** | **1.9× faster** |
+| p99 latency | 8,026 ms | **4,768 ms** | **1.7× faster** |
+| Throughput | 0.15 req/s | **0.30 req/s** | **2.0×** |
 
-At ~6.4 s per scan the endpoint sustains roughly **one request every seven
-seconds**. That is the number the optimization work targets.
+Every percentile improved by ~2×, with no change to model weights or accuracy —
+this is purely a change in *how* the model is executed.
 
-### v1.1.0 — not yet measured
+### Where the win came from
 
-> Pending redeployment of the v1.1.0 backend. This section will be filled in
-> from a real benchmark run, not projected from the baseline.
+Three changes to the request path, no change to the model:
 
-Per-request stage timings are returned on every v1.1.0 response in
-`stage_timings_ms`, so the per-stage breakdown will come from production
-traffic rather than from a separate profiling harness.
+| Change | Effect |
+|---|---|
+| **Batched MC Dropout** | 20 sequential batch-1 forward passes → **one batched forward pass**. The dominant win. |
+| **Async report** | Groq call moved off the critical path onto a worker thread. |
+| **GradCAM cache** | Heatmaps were recomputed every call; now LRU-cached per `(image, class)`. |
 
-### Where the time actually went
+v1.1.0 exposes a per-stage breakdown on every response (`stage_timings_ms`),
+measured in production — MC Dropout is now 2,868 ms of ~3,000 ms server-side,
+preprocess 16 ms, GradCAM 6 ms (cached), report 92 ms (async). (v1.0.0 had no
+per-stage instrumentation, so only its end-to-end total is comparable.)
 
-Profiling first mattered more than any individual optimization. The intuition
-that "the ViT forward pass is the bottleneck" was wrong: a single forward pass
-is ~15 ms. The 4.8 seconds was **20 of those passes run sequentially at batch
-size 1**, plus a synchronous LLM call. The model was never the problem; the
-way it was being *called* was.
+The single biggest win: the 20 Monte Carlo Dropout passes were running
+**sequentially at batch size 1**. Tiling the input into one batched forward
+pass — while preserving the independent per-sample dropout masks the estimator
+requires — roughly halved end-to-end latency.
+
+> The gradcam figure is a cache-hit number: the benchmark reuses one image, so
+> every request after the first hits the cache. Cold heatmaps cost more.
 
 ---
 

@@ -76,28 +76,7 @@ jobs:
           NEXTAUTH_SECRET: dummy-secret-for-build-only
           NEXTAUTH_URL: http://localhost:3000
 
-  build-docker:
-    name: Build image
-    runs-on: ubuntu-latest
-    needs: [test, frontend]
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build Docker image
-        run: docker build -f docker/Dockerfile -t chestai:${{ github.sha }} .
-
-  deploy-spaces:
-    name: Deploy to HF Spaces
-    runs-on: ubuntu-latest
-    needs: build-docker
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Push to HuggingFace Spaces
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          pip install huggingface_hub
-          python scripts/deploy_spaces.py
+# Deployment is done manually by uploading files to the HuggingFace Space, so
+# CI stops at lint/test/build. The previous build-docker + deploy-spaces jobs
+# required an HF_TOKEN secret and a Spaces-compatible Docker build that this
+# repo doesn't maintain, and only produced a spurious red X on every push.

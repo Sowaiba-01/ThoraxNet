@@ -44,6 +44,12 @@ async def predict(
     file: Annotated[UploadFile, File(description="Chest X-ray image (PNG/JPEG)")],
     patient_age: Annotated[Optional[float], Form()] = None,
     patient_gender: Annotated[Optional[str], Form()] = None,
+    generate_report: Annotated[
+        bool, Form(description="Generate the LLM narrative report (adds ~1.3s)")
+    ] = True,
+    generate_gradcam: Annotated[
+        bool, Form(description="Generate GradCAM overlays for positive findings")
+    ] = True,
 ) -> PredictionResponse:
     if not pipeline.is_loaded:
         raise HTTPException(
@@ -81,6 +87,8 @@ async def predict(
             image_bytes=contents,
             patient_age=patient_age,
             patient_gender=patient_gender,
+            generate_report=generate_report,
+            generate_gradcam=generate_gradcam,
         )
     except Exception as e:
         raise HTTPException(
@@ -88,14 +96,21 @@ async def predict(
             detail=f"Inference failed: {str(e)}",
         )
 
-    # Store GradCAM images for retrieval.
+    # Store GradCAM overlays so the client can fetch them by session id.
+    #
+    # BUG FIX (v1.1.0): this previously read `pipeline.gradcam._last_overlays`,
+    # an attribute that never existed — the pipeline built its overlays in a
+    # local variable and discarded them. Every /gradcam/{id}/{cls} request
+    # therefore 404'd or crashed with AttributeError. The pipeline now records
+    # overlays on the ViTGradCAM instance via generate_overlays().
     if response.gradcam_available:
         session_id = str(uuid.uuid4())
-        _gradcam_store[session_id] = pipeline.gradcam._last_overlays  # type: ignore
-        # Evict oldest if over limit.
-        if len(_gradcam_store) > _MAX_STORE_SIZE:
+        _gradcam_store[session_id] = dict(pipeline.gradcam._last_overlays)
+        # Evict oldest if over limit (OrderedDict semantics: dicts are ordered).
+        while len(_gradcam_store) > _MAX_STORE_SIZE:
             oldest_key = next(iter(_gradcam_store))
             del _gradcam_store[oldest_key]
+        response.gradcam_session_id = session_id
 
     return response
 

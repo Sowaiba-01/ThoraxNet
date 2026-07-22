@@ -1,0 +1,59 @@
+[
+  {
+    "concurrency": 1,
+    "requests": 30,
+    "failures": 0,
+    "p50_ms": 3327.4,
+    "p95_ms": 3862.3,
+    "p99_ms": 4767.6,
+    "mean_ms": 3380.9,
+    "min_ms": 3024.0,
+    "max_ms": 4767.6,
+    "throughput_rps": 0.3,
+    "error_detail": {},
+    "server_stages_mean_ms": {
+      "gradcam": 6.2,
+      "mc_dropout": 2868.2,
+      "preprocess": 16.2,
+      "report": 92.5
+    }
+  },
+  {
+    "concurrency": 4,
+    "requests": 30,
+    "failures": 0,
+    "p50_ms": 11150.4,
+    "p95_ms": 15350.3,
+    "p99_ms": 19282.7,
+    "mean_ms": 11366.3,
+    "min_ms": 8065.6,
+    "max_ms": 19282.7,
+    "throughput_rps": 0.34,
+    "error_detail": {},
+    "server_stages_mean_ms": {
+      "gradcam": 6.2,
+      "mc_dropout": 2861.4,
+      "preprocess": 16.4,
+      "report": 3137.7
+    }
+  },
+  {
+    "concurrency": 16,
+    "requests": 30,
+    "failures": 0,
+    "p50_ms": 43329.0,
+    "p95_ms": 57314.0,
+    "p99_ms": 57386.2,
+    "mean_ms": 39328.3,
+    "min_ms": 9861.4,
+    "max_ms": 57386.2,
+    "throughput_rps": 0.34,
+    "error_detail": {},
+    "server_stages_mean_ms": {
+      "gradcam": 6.2,
+      "mc_dropout": 2927.1,
+      "preprocess": 15.9,
+      "report": 5186.8
+    }
+  }
+]

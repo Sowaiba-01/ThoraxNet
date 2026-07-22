@@ -43,7 +43,10 @@ class PredictionResponse(BaseModel):
     """Full prediction response returned to the client."""
     findings: list[FindingResult] = Field(description="Per-class findings")
     entropy: float = Field(description="Overall predictive entropy")
-    report: str = Field(description="Auto-generated radiology report")
+    report: Optional[str] = Field(
+        None,
+        description="Auto-generated radiology report (null if generate_report=false)",
+    )
     gradcam_available: bool = Field(
         description="True if GradCAM images were generated"
     )
@@ -51,7 +54,21 @@ class PredictionResponse(BaseModel):
         default_factory=list,
         description="Classes for which GradCAM heatmaps are available",
     )
+    gradcam_session_id: Optional[str] = Field(
+        None,
+        description=(
+            "Session id for retrieving overlays at "
+            "/api/v1/gradcam/{session_id}/{class_name}"
+        ),
+    )
     inference_time_ms: float = Field(description="Server-side inference time in ms")
+    stage_timings_ms: dict[str, float] = Field(
+        default_factory=dict,
+        description=(
+            "Per-stage latency breakdown in ms: preprocess, mc_dropout, "
+            "gradcam, report. Used for profiling and regression tracking."
+        ),
+    )
     model_version: str = Field(description="Model version identifier")
 
     class Config:
@@ -70,8 +87,14 @@ class PredictionResponse(BaseModel):
                 "report": "FINDINGS:\nAtelectasis present...",
                 "gradcam_available": True,
                 "gradcam_classes": ["Atelectasis"],
-                "inference_time_ms": 420.5,
-                "model_version": "1.0.0",
+                "inference_time_ms": 183.2,
+                "stage_timings_ms": {
+                    "preprocess": 12.4,
+                    "mc_dropout": 96.1,
+                    "gradcam": 61.8,
+                    "report": 12.9,
+                },
+                "model_version": "1.1.0",
             }
         }
 

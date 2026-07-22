@@ -1,0 +1,21 @@
+[
+  {
+    "concurrency": 1,
+    "requests": 30,
+    "failures": 0,
+    "p50_ms": 3145.8,
+    "p95_ms": 3287.4,
+    "p99_ms": 3394.7,
+    "mean_ms": 3171.3,
+    "min_ms": 3029.7,
+    "max_ms": 3394.7,
+    "throughput_rps": 0.32,
+    "error_detail": {},
+    "server_stages_mean_ms": {
+      "gradcam": 5.4,
+      "mc_dropout": 2770.5,
+      "preprocess": 15.7,
+      "report": 42.4
+    }
+  }
+]

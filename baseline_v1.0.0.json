@@ -1,0 +1,16 @@
+[
+  {
+    "concurrency": 1,
+    "requests": 30,
+    "failures": 0,
+    "p50_ms": 6386.6,
+    "p95_ms": 7525.2,
+    "p99_ms": 8026.4,
+    "mean_ms": 6492.1,
+    "min_ms": 5795.6,
+    "max_ms": 8026.4,
+    "throughput_rps": 0.15,
+    "error_detail": {},
+    "server_stages_mean_ms": {}
+  }
+]

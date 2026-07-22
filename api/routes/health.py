@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 from api.inference import pipeline
 from api.schemas import HealthResponse
-import torch
 
 router = APIRouter(tags=["system"])
 

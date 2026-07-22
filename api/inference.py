@@ -7,6 +7,7 @@ import os
 import time
 
 import torch
+import torch.nn as nn
 from PIL import Image
 
 from data.transforms import build_transforms
@@ -47,7 +48,7 @@ class InferencePipeline:
     async def load(self) -> None:
         from huggingface_hub import hf_hub_download
 
-        model_repo = os.environ.get("MODEL_HUB_REPO", "")
+        model_repo = os.environ.get("MODEL_HUB_REPO", "Sowaiba01/chestai-model")
         checkpoint_path = os.environ.get("MODEL_CHECKPOINT", "")
 
         if not checkpoint_path and model_repo:
@@ -62,10 +63,44 @@ class InferencePipeline:
             )
 
         print(f"[Pipeline] Loading checkpoint: {checkpoint_path}")
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
+        state_dict = checkpoint["model_state_dict"]
+
+        # The published checkpoint's classification head does not necessarily
+        # match the default architecture in classifier.py (the shipped weights
+        # use a 512-wide intermediate layer, while the class default is 256).
+        # Read the true dimensions straight from the checkpoint and rebuild the
+        # head to match, so the same code loads either variant. This block is
+        # load-bearing: removing it produces a size-mismatch RuntimeError at
+        # startup and the Space fails to boot.
+        head_key = "head.2.weight"
+        if head_key in state_dict:
+            intermediate_dim = state_dict[head_key].shape[0]
+            embed_dim = state_dict[head_key].shape[1]
+        else:
+            intermediate_dim = 512
+            embed_dim = 512
+        num_classes = len(CLASSES)
+        dropout_rate = 0.3
+
+        print(f"[Pipeline] Detected head: Linear({embed_dim} → {intermediate_dim} → {num_classes})")
 
         self.model = ChestAIClassifier()
-        self.model.load_state_dict(checkpoint["model_state_dict"])
+        self.model.head = nn.Sequential(
+            nn.LayerNorm(embed_dim),
+            nn.Dropout(dropout_rate),
+            nn.Linear(embed_dim, intermediate_dim),
+            nn.GELU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(intermediate_dim, num_classes),
+        ).to(self.device)
+
+        missing, unexpected = self.model.load_state_dict(state_dict, strict=False)
+        if missing:
+            print(f"[Pipeline] Missing keys: {missing}")
+        if unexpected:
+            print(f"[Pipeline] Unexpected keys: {unexpected}")
+
         self.model.to(self.device)
         self.model.eval()
 

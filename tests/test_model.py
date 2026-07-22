@@ -77,3 +77,50 @@ def test_enable_dropout_sets_train_mode():
     enable_dropout(model_small)
     dropout_layers = [m for m in model_small.modules() if isinstance(m, nn.Dropout)]
     assert all(d.training for d in dropout_layers)
+
+
+def test_head_can_be_rebuilt_to_match_a_512wide_checkpoint(model):
+    """
+    REGRESSION (2026-07-21 outage): the published checkpoint's head is
+    Linear(512 -> 512 -> 14), but ChestAIClassifier defaults to a 256-wide
+    intermediate layer. InferencePipeline.load() reads the true width from the
+    checkpoint and rebuilds `model.head` before loading weights. If that rebuild
+    is dropped, load_state_dict raises a size-mismatch RuntimeError at startup
+    and the Space fails to boot.
+
+    This test reproduces the exact shape mismatch and verifies the rebuild
+    strategy load() uses, without needing the 346 MB checkpoint.
+    """
+    import torch.nn as nn
+
+    embed_dim, intermediate_dim, num_classes = 512, 512, 14
+
+    # A state_dict shaped like the real 512-wide checkpoint head.
+    checkpoint_head = nn.Sequential(
+        nn.LayerNorm(embed_dim),
+        nn.Dropout(0.3),
+        nn.Linear(embed_dim, intermediate_dim),
+        nn.GELU(),
+        nn.Dropout(0.3),
+        nn.Linear(intermediate_dim, num_classes),
+    )
+    head_state = {f"head.{k}": v for k, v in checkpoint_head.state_dict().items()}
+
+    # The default model head is 256-wide: loading directly must fail...
+    assert model.head[2].out_features == 256
+    with pytest.raises(RuntimeError):
+        model.load_state_dict(head_state, strict=False)  # noqa: PT012 - want the raise
+
+    # ...but after the load() rebuild strategy, the 512-wide weights fit.
+    detected = head_state["head.2.weight"].shape[0]
+    model.head = nn.Sequential(
+        nn.LayerNorm(embed_dim),
+        nn.Dropout(0.3),
+        nn.Linear(embed_dim, detected),
+        nn.GELU(),
+        nn.Dropout(0.3),
+        nn.Linear(detected, num_classes),
+    )
+    missing, unexpected = model.load_state_dict(head_state, strict=False)
+    assert not any(k.startswith("head.") for k in missing)
+    assert model.head[2].out_features == 512

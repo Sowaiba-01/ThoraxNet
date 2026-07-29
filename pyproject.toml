@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 [project]
 name = "chestai"
 version = "1.0.0"
@@ -26,3 +26,5 @@ testpaths = ["tests"]
 # sys.path (only `python -m pytest` does), so without this the suite passes
 # locally and fails in CI purely on invocation style.
 pythonpath = ["."]
+[tool.setuptools.packages.find]
+include = ["api*", "data*", "models*", "training*", "explainability*", "fairness*", "report_generation*"]

@@ -1,6 +1,6 @@
-# ChestAI — AI Chest X-Ray Diagnostic Platform
+# ThoraxNet
 
-<p align="center">
+<p>
   <a href="https://github.com/Sowaiba-01/ThoraxNet/actions/workflows/ci.yml">
     <img src="https://github.com/Sowaiba-01/ThoraxNet/actions/workflows/ci.yml/badge.svg" alt="CI status" />
   </a>
@@ -9,21 +9,6 @@
   <img src="https://img.shields.io/badge/Mean%20AUC-0.8215-10b981" alt="mean AUC" />
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Model-BioMedCLIP%20ViT--B%2F16-10b981?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Dataset-NIH%20ChestX--ray14-blue?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Python-3.11-blue?style=for-the-badge&logo=python" />
-  <img src="https://img.shields.io/badge/FastAPI-0.110-009688?style=for-the-badge&logo=fastapi" />
-  <img src="https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js" />
-  <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" />
-</p>
-
-<p align="center">
-  <a href="https://thorax-tho.vercel.app"><strong>Live Demo</strong></a> ·
-  <a href="https://Sowaiba01-ThoraxNet.hf.space/docs"><strong>API Docs</strong></a> ·
-  <a href="https://huggingface.co/Sowaiba01/ThoraxNet"><strong>Model Weights</strong></a> ·
-  <a href="CHANGELOG.md"><strong>Changelog</strong></a>
-</p>
 
 
 ThoraxNet is a production-grade, full-stack AI diagnostic platform that detects **14 thoracic pathologies** from chest X-rays. It combines a fine-tuned BioMedCLIP vision-language foundation model with Monte Carlo Dropout uncertainty quantification, ViT-GradCAM explainability, and automated radiology report generation via Groq's LLaMA-3.3-70b.
@@ -268,7 +253,7 @@ cd chestai
 pip install -r requirements.txt
 
 # Set environment variables
-export MODEL_HUB_REPO=Sowaiba01/chestai-model
+export MODEL_HUB_REPO=Sowaiba01/ThoraxNet
 export GROQ_API_KEY=your_groq_api_key
 
 uvicorn api.main:app --host 0.0.0.0 --port 7860 --reload
@@ -488,13 +473,6 @@ If you use ChestAI in your research, please cite:
 }
 ```
 
-**Acknowledgements**
-
-- [NIH ChestX-ray14](https://nihcc.app.box.com/v/ChestXray-NIHCC) — Wang et al., 2017
-- [BioMedCLIP](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) — Microsoft Research
-- [Groq](https://groq.com) — LLaMA inference API
-
----
 
 ## License
 
